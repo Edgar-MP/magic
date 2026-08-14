@@ -54,33 +54,56 @@ export function ProxyEditor() {
   const [status, setStatus] = useState<string | null>(null)
   const [showPrint, setShowPrint] = useState(false)
 
-  if (design === undefined) return <p className="text-sm text-muted">Cargando…</p>
+  // Borrador local: nada de esto toca IndexedDB hasta que se pulsa «Guardar».
+  // Sin esto, cada tecla se guardaba sola y no había forma de descartar un
+  // cambio a medias.
+  const [draft, setDraft] = useState<ProxyDesign | undefined>(design)
+  const [dirty, setDirty] = useState(false)
 
-  /**
-   * Cualquier cambio desde aquí marca el proxy como editado: es lo que permite
-   * ir por un mazo entero sabiendo qué queda por repasar.
-   */
-  const save = (changes: Partial<ProxyDesign>) =>
-    void db.proxies.put({ ...design, ...changes, edited: true, updatedAt: Date.now() })
+  useEffect(() => {
+    // Sólo se resincroniza al cargar el proxy o al cambiar de proxy — nunca
+    // mientras hay cambios sin guardar, para no pisar lo que se está editando.
+    if (design && (!draft || draft.id !== design.id)) {
+      setDraft(design)
+      setDirty(false)
+    }
+  }, [design, draft])
+
+  if (draft === undefined) return <p className="text-sm text-muted">Cargando…</p>
+
+  const update = (changes: Partial<ProxyDesign>) => {
+    setDraft((current) => (current ? { ...current, ...changes } : current))
+    setDirty(true)
+  }
 
   const setText = (key: keyof ProxyDesign['text'], value: string) =>
-    save({ text: { ...design.text, [key]: value } })
+    update({ text: { ...draft.text, [key]: value } })
 
   const setFlag = (key: keyof ProxyDesign['flags'], value: boolean) =>
-    save({ flags: { ...design.flags, [key]: value } })
+    update({ flags: { ...draft.flags, [key]: value } })
+
+  /**
+   * Marca el proxy como editado: es lo que permite ir por un mazo entero
+   * sabiendo qué queda por repasar.
+   */
+  const commit = async () => {
+    if (!dirty) return
+    await db.proxies.put({ ...draft, edited: true, updatedAt: Date.now() })
+    setDirty(false)
+  }
 
   const uploadArt = async (file: File) => {
     const blobId = newId()
     await db.blobs.put({ id: blobId, blob: file, mime: file.type, createdAt: Date.now() })
     // El encuadre se reinicia: la foto nueva no tiene nada que ver con la anterior.
-    save({ art: { blobId, x: 0, y: 0, scale: 1 } })
+    update({ art: { blobId, x: 0, y: 0, scale: 1 } })
   }
 
   const exportJson = async () => {
-    const file: ProxyFile = { version: 1, design }
+    const file: ProxyFile = { version: 1, design: draft }
 
-    if (design.art.blobId) {
-      const blob = await getBlob(design.art.blobId)
+    if (draft.art.blobId) {
+      const blob = await getBlob(draft.art.blobId)
       if (blob) file.artDataUrl = await blobToDataUrl(blob)
     }
 
@@ -89,7 +112,7 @@ export function ProxyEditor() {
     )
     const link = document.createElement('a')
     link.href = url
-    link.download = `${design.text.name || 'proxy'}.json`
+    link.download = `${draft.text.name || 'proxy'}.json`
     link.click()
     URL.revokeObjectURL(url)
   }
@@ -97,11 +120,11 @@ export function ProxyEditor() {
   const exportPng = async () => {
     setStatus('Renderizando a tamaño de impresión…')
     try {
-      const bytes = await renderProxyToPng(design)
+      const bytes = await renderProxyToPng(draft)
       const url = URL.createObjectURL(new Blob([bytes as unknown as BlobPart], { type: 'image/png' }))
       const link = document.createElement('a')
       link.href = url
-      link.download = `${design.text.name || 'proxy'}.png`
+      link.download = `${draft.text.name || 'proxy'}.png`
       link.click()
       URL.revokeObjectURL(url)
       setStatus('Listo.')
@@ -116,7 +139,16 @@ export function ProxyEditor() {
         <Link to="/proxies" className="text-sm text-muted hover:text-white">
           ← Proxies
         </Link>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {dirty && <span className="text-xs text-amber-300">Cambios sin guardar</span>}
+          <button
+            type="button"
+            onClick={() => void commit()}
+            disabled={!dirty}
+            className="rounded border border-accent bg-accent/15 px-3 py-1.5 text-sm text-accent hover:bg-accent/25 disabled:cursor-default disabled:border-edge disabled:bg-transparent disabled:text-muted"
+          >
+            Guardar
+          </button>
           <button
             type="button"
             onClick={() => void exportPng()}
@@ -142,7 +174,7 @@ export function ProxyEditor() {
             type="button"
             onClick={() => {
               if (confirm('¿Borrar este proxy?')) {
-                void deleteProxy(design.id).then(() => navigate('/proxies'))
+                void deleteProxy(draft.id).then(() => navigate('/proxies'))
               }
             }}
             className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-red-500 hover:text-red-400"
@@ -156,46 +188,46 @@ export function ProxyEditor() {
 
       <div className="grid gap-6 lg:grid-cols-[24rem_1fr]">
         <div className="flex flex-col gap-3">
-          <CardPreview design={design} onArtChange={(art) => save({ art })} />
-          <ArtControls design={design} onChange={save} onUpload={uploadArt} />
+          <CardPreview design={draft} onArtChange={(art) => update({ art })} />
+          <ArtControls design={draft} onChange={update} onUpload={uploadArt} />
         </div>
 
         <div className="flex flex-col gap-4">
           <Section title="Texto">
-            <Field label="Nombre" value={design.text.name} onChange={(v) => setText('name', v)} />
+            <Field label="Nombre" value={draft.text.name} onChange={(v) => setText('name', v)} />
             <Field
               label="Coste de maná"
-              value={design.text.mana}
+              value={draft.text.mana}
               onChange={(v) => setText('mana', v)}
               hint="Notación de Scryfall: {2}{W}{U}"
             />
             <Field
               label="Etiqueta bajo el nombre"
-              value={design.text.note}
+              value={draft.text.note}
               onChange={(v) => setText('note', v)}
               hint="Sale en una cajita sobre la ilustración. Por ejemplo la carta original, o «PROXY». Vacía no se dibuja."
             />
-            <Field label="Tipo" value={design.text.type} onChange={(v) => setText('type', v)} />
+            <Field label="Tipo" value={draft.text.type} onChange={(v) => setText('type', v)} />
             <Field
               label="Texto de reglas"
-              value={design.text.oracle}
+              value={draft.text.oracle}
               onChange={(v) => setText('oracle', v)}
               rows={5}
               hint="Un salto de línea por habilidad. Los paréntesis salen en cursiva."
             />
             <Field
               label="Ambientación"
-              value={design.text.flavor}
+              value={draft.text.flavor}
               onChange={(v) => setText('flavor', v)}
               rows={2}
             />
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Fuerza/Resistencia" value={design.text.pt} onChange={(v) => setText('pt', v)} />
-              <Field label="Artista" value={design.text.artist} onChange={(v) => setText('artist', v)} />
+              <Field label="Fuerza/Resistencia" value={draft.text.pt} onChange={(v) => setText('pt', v)} />
+              <Field label="Artista" value={draft.text.artist} onChange={(v) => setText('artist', v)} />
             </div>
             <Field
               label="Línea inferior"
-              value={design.text.info}
+              value={draft.text.info}
               onChange={(v) => setText('info', v)}
               hint="Por ejemplo: M10 · 146 · C"
             />
@@ -205,8 +237,8 @@ export function ProxyEditor() {
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-xs text-muted">Variante</span>
               <select
-                value={design.variant}
-                onChange={(e) => save({ variant: e.target.value as CardVariant })}
+                value={draft.variant}
+                onChange={(e) => update({ variant: e.target.value as CardVariant })}
                 className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
               >
                 {CARD_VARIANTS.map((v) => (
@@ -216,10 +248,10 @@ export function ProxyEditor() {
                 ))}
               </select>
               <span className="text-[11px] text-muted/70">
-                {design.variant === 'regular' && 'La carta de siempre, con su borde negro.'}
-                {design.variant === 'extendedArt' &&
+                {draft.variant === 'regular' && 'La carta de siempre, con su borde negro.'}
+                {draft.variant === 'extendedArt' &&
                   'La caja de texto es transparente y se ve la ilustración por detrás.'}
-                {design.variant === 'borderless' &&
+                {draft.variant === 'borderless' &&
                   'La ilustración llega a los cuatro cantos. Sin corona de legendaria.'}
               </span>
             </label>
@@ -228,8 +260,8 @@ export function ProxyEditor() {
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-xs text-muted">Color</span>
                 <select
-                  value={design.frameColor}
-                  onChange={(e) => save({ frameColor: e.target.value as FrameColor })}
+                  value={draft.frameColor}
+                  onChange={(e) => update({ frameColor: e.target.value as FrameColor })}
                   className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
                 >
                   {FRAME_COLORS.map((c) => (
@@ -243,9 +275,9 @@ export function ProxyEditor() {
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-xs text-muted">Segundo color (híbrida)</span>
                 <select
-                  value={design.secondColor ?? ''}
+                  value={draft.secondColor ?? ''}
                   onChange={(e) =>
-                    save(
+                    update(
                       e.target.value === ''
                         ? { secondColor: undefined }
                         : { secondColor: e.target.value as FrameColor },
@@ -266,22 +298,22 @@ export function ProxyEditor() {
             <div className="flex flex-wrap gap-4 text-sm">
               <Toggle
                 label="Legendaria (corona)"
-                checked={design.flags.legendary}
+                checked={draft.flags.legendary}
                 onChange={(v) => setFlag('legendary', v)}
               />
               <Toggle
                 label="Nyx"
-                checked={design.flags.nyx}
+                checked={draft.flags.nyx}
                 onChange={(v) => setFlag('nyx', v)}
               />
               <Toggle
                 label="Sello de rara"
-                checked={design.flags.stamp}
+                checked={draft.flags.stamp}
                 onChange={(v) => setFlag('stamp', v)}
               />
               <Toggle
                 label="Caja de F/R"
-                checked={design.flags.showPt}
+                checked={draft.flags.showPt}
                 onChange={(v) => setFlag('showPt', v)}
               />
             </div>
@@ -290,9 +322,9 @@ export function ProxyEditor() {
               <label className="flex flex-col gap-1 text-sm">
                 <span className="text-xs text-muted">Símbolo de tierra básica</span>
                 <select
-                  value={design.basicWatermark ?? ''}
+                  value={draft.basicWatermark ?? ''}
                   onChange={(e) =>
-                    save(
+                    update(
                       e.target.value === ''
                         ? { basicWatermark: undefined }
                         : { basicWatermark: e.target.value as BasicSymbol },
@@ -308,7 +340,7 @@ export function ProxyEditor() {
                   ))}
                 </select>
                 <span className="text-[11px] text-muted/70">
-                  {design.variant === 'fullArtLand'
+                  {draft.variant === 'fullArtLand'
                     ? 'El círculo de maná de abajo a la izquierda.'
                     : 'La marca de agua grande de la caja de texto.'}
                 </span>
@@ -316,8 +348,8 @@ export function ProxyEditor() {
 
               <Field
                 label="Símbolo de expansión (URL)"
-                value={design.setSymbol ?? ''}
-                onChange={(v) => save(v.trim() === '' ? { setSymbol: undefined } : { setSymbol: v })}
+                value={draft.setSymbol ?? ''}
+                onChange={(v) => update(v.trim() === '' ? { setSymbol: undefined } : { setSymbol: v })}
                 hint="Se rellena al crear el proxy desde una carta real."
               />
             </div>
@@ -326,7 +358,7 @@ export function ProxyEditor() {
       </div>
 
       {showPrint && (
-        <ProxyPrintDialog designs={[design]} onClose={() => setShowPrint(false)} />
+        <ProxyPrintDialog designs={[draft]} onClose={() => setShowPrint(false)} />
       )}
     </div>
   )

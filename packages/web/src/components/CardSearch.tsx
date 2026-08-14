@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { indexReady, loadIndex, putCards, scryfall, searchLocal } from '@magic/cards'
+import { indexReady, loadIndex, putCards, scryfall, searchLocal, type StoredProxy } from '@magic/cards'
 import type { Card } from '@magic/shared'
 import { ManaCost } from './ManaCost.js'
 
@@ -40,6 +40,9 @@ export interface CardSearchProps {
   identity?: string[]
   placeholder?: string
   autoFocus?: boolean
+  /** Tus proxies guardados, para poder añadir uno ya hecho en vez de crear otro. */
+  proxies?: StoredProxy[]
+  onPickProxy?: (proxy: StoredProxy) => void
 }
 
 export function CardSearch({
@@ -48,6 +51,8 @@ export function CardSearch({
   identity,
   placeholder = 'Buscar carta…',
   autoFocus,
+  proxies,
+  onPickProxy,
 }: CardSearchProps) {
   const [text, setText] = useState('')
   const [remoteQuery, setRemoteQuery] = useState('')
@@ -60,6 +65,16 @@ export function CardSearch({
     if (!hasIndex || usesSyntax || text.trim().length < 2) return []
     return searchLocal(text, { limit: 12, ...(format ? { format } : {}), ...(identity ? { identity } : {}) })
   }, [text, hasIndex, usesSyntax, format, identity])
+
+  // Tus proxies cuyo nombre coincide: sólo tiene sentido añadir los que ya
+  // tienen carta original detrás (sourceCardId), que es lo que necesita el mazo.
+  const ownProxies = useMemo(() => {
+    if (!proxies || text.trim().length < 2) return []
+    const needle = text.trim().toLowerCase()
+    return proxies
+      .filter((p) => p.sourceCardId && p.text.name.toLowerCase().includes(needle))
+      .slice(0, 8)
+  }, [proxies, text])
 
   const remote = useQuery({
     queryKey: ['search', remoteQuery, format, identity?.join('')],
@@ -120,6 +135,28 @@ export function CardSearch({
         <p className="text-xs text-muted">
           Sintaxis de Scryfall detectada: pulsa Enter para buscar en la API.
         </p>
+      )}
+
+      {ownProxies.length > 0 && (
+        <ul className="divide-y divide-edge rounded border border-accent/40 bg-panel">
+          {ownProxies.map((proxy) => (
+            <li key={proxy.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  onPickProxy?.(proxy)
+                  setText('')
+                }}
+                className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-edge"
+              >
+                <span className="truncate">{proxy.text.name || 'Sin nombre'}</span>
+                <span className="shrink-0 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
+                  Proxy
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
       )}
 
       {local.length > 0 && (

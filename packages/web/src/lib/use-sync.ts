@@ -73,12 +73,19 @@ export function useSync(): SyncStatus {
     return () => window.removeEventListener('online', onOnline)
   }, [userId, sync])
 
-  // El contador de pendientes se refresca solo mientras se trabaja.
+  // El contador de pendientes se refresca solo mientras se trabaja, y en
+  // cuanto aparece algo sin subir se sincroniza sola: guardar ya implica
+  // subirlo, sin que haga falta tocar el botón.
   useEffect(() => {
     if (!userId) return
-    const timer = setInterval(() => void countPending().then(setPending), 5000)
+    const timer = setInterval(() => void countPending().then(setPending), 2000)
     return () => clearInterval(timer)
   }, [userId])
+
+  useEffect(() => {
+    if (!userId || pending === 0 || state === 'running') return
+    sync()
+  }, [userId, pending, state, sync])
 
   return { state, pending, lastRunAt, lastReport, error, userId, sync }
 }

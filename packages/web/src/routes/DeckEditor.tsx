@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { db, getProxy } from '@magic/cards'
+import { db, getProxy, loadCards, type StoredProxy } from '@magic/cards'
 import {
   FORMATS,
   FORMAT_LABELS,
@@ -17,12 +17,15 @@ import {
   type Format,
 } from '@magic/shared'
 import { cardToDesign } from '@magic/renderer'
+import { CardPreview } from '../components/CardPreview.js'
 import { CardSearch } from '../components/CardSearch.js'
 import { CATEGORY_ORDER, Issues, Stats, categoryOf } from '../components/DeckPanels.js'
 import { ManaCost } from '../components/ManaCost.js'
 import { DecklistIO } from '../components/DecklistIO.js'
 import { PrintDialog } from '../components/PrintDialog.js'
-import { newId, saveDeck, useCardMap, useDeck } from '../lib/db-hooks.js'
+import { newId, saveDeck, useCardMap, useDeck, useProxies } from '../lib/db-hooks.js'
+
+type View = 'list' | 'grid'
 
 export function DeckEditor() {
   const { id } = useParams<{ id: string }>()
@@ -31,9 +34,12 @@ export function DeckEditor() {
 
   const ids = useMemo(() => deck?.entries.map((e) => e.cardId) ?? [], [deck])
   const { cards, loading } = useCardMap(ids)
+  const proxies = useProxies()
+  const proxyMap = useMemo(() => new Map((proxies ?? []).map((p) => [p.id, p])), [proxies])
 
   const [showIO, setShowIO] = useState(false)
   const [showPrint, setShowPrint] = useState(false)
+  const [view, setView] = useState<View>('list')
 
   if (deck === undefined) {
     return <p className="text-sm text-muted">Cargando mazo…</p>
@@ -46,17 +52,32 @@ export function DeckEditor() {
 
   const update = (entries: DeckEntry[]) => void saveDeck({ ...deck, entries })
 
-  const addCard = (card: Card, board: Board = 'main') => {
+  const addCard = (card: Card, board: Board = 'main', proxyId?: string) => {
     const existing = deck.entries.find((e) => e.cardId === card.id && e.board === board)
     if (existing) {
       update(
         deck.entries.map((e) =>
-          e === existing ? { ...e, qty: e.qty + 1 } : e,
+          e === existing ? { ...e, qty: e.qty + 1, ...(proxyId ? { proxyId } : {}) } : e,
         ),
       )
       return
     }
-    update([...deck.entries, { cardId: card.id, qty: 1, board }])
+    update([...deck.entries, { cardId: card.id, qty: 1, board, ...(proxyId ? { proxyId } : {}) }])
+  }
+
+  /** Añade un proxy ya hecho (no lo crea): usa la carta original que lleva detrás. */
+  const addProxy = async (proxy: StoredProxy) => {
+    if (!proxy.sourceCardId) return
+    const found = await loadCards([proxy.sourceCardId])
+    const card = found.get(proxy.sourceCardId)
+    if (!card) return
+    addCard(
+      card,
+      deck.format === 'commander' && countBoard(deck, 'command') === 0 && canBeCommander(card)
+        ? 'command'
+        : 'main',
+      proxy.id,
+    )
   }
 
   const changeQty = (entry: DeckEntry, delta: number) => {
@@ -128,6 +149,22 @@ export function DeckEditor() {
         >
           Imprimir
         </button>
+        <div className="flex overflow-hidden rounded border border-edge text-sm">
+          <button
+            type="button"
+            onClick={() => setView('list')}
+            className={`px-2.5 py-1.5 ${view === 'list' ? 'bg-accent/15 text-accent' : 'bg-panel text-muted hover:text-white'}`}
+          >
+            Lista
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('grid')}
+            className={`border-l border-edge px-2.5 py-1.5 ${view === 'grid' ? 'bg-accent/15 text-accent' : 'bg-panel text-muted hover:text-white'}`}
+          >
+            Cuadrícula
+          </button>
+        </div>
       </header>
 
       <p className="text-sm text-muted">
@@ -151,6 +188,8 @@ export function DeckEditor() {
                   : 'main',
               )
             }
+            proxies={proxies}
+            onPickProxy={(p) => void addProxy(p)}
             {...(deck.format !== 'casual' ? { format: deck.format } : {})}
             {...(deck.format === 'commander' && identity.length > 0 ? { identity } : {})}
           />
@@ -160,6 +199,8 @@ export function DeckEditor() {
             board="command"
             deck={deck}
             cards={cards}
+            proxies={proxyMap}
+            view={view}
             onQty={changeQty}
             onMove={moveTo}
             onProxy={proxy}
@@ -170,6 +211,8 @@ export function DeckEditor() {
             board="main"
             deck={deck}
             cards={cards}
+            proxies={proxyMap}
+            view={view}
             onQty={changeQty}
             onMove={moveTo}
             onProxy={proxy}
@@ -179,6 +222,8 @@ export function DeckEditor() {
             board="side"
             deck={deck}
             cards={cards}
+            proxies={proxyMap}
+            view={view}
             onQty={changeQty}
             onMove={moveTo}
             onProxy={proxy}
@@ -205,6 +250,8 @@ interface DeckBoardProps {
   board: Board
   deck: Deck
   cards: Map<string, Card>
+  proxies: Map<string, StoredProxy>
+  view: View
   onQty: (entry: DeckEntry, delta: number) => void
   onMove: (entry: DeckEntry, board: Board) => void
   onProxy: (entry: DeckEntry, card: Card) => void
@@ -217,6 +264,8 @@ function DeckBoard({
   board,
   deck,
   cards,
+  proxies,
+  view,
   onQty,
   onMove,
   onProxy,
@@ -251,18 +300,32 @@ function DeckBoard({
             <h3 className="px-3 pt-2 text-[11px] uppercase tracking-wide text-muted">
               {category} ({list.reduce((s, e) => s + e.qty, 0)})
             </h3>
-            <ul className="divide-y divide-edge/60">
-              {list.map((entry) => (
-                <DeckRow
-                  key={`${entry.cardId}-${entry.board}`}
-                  entry={entry}
-                  card={cards.get(entry.cardId)}
-                  onQty={onQty}
-                  onMove={onMove}
-                  onProxy={onProxy}
-                />
-              ))}
-            </ul>
+            {view === 'grid' ? (
+              <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 lg:grid-cols-4">
+                {list.map((entry) => (
+                  <DeckGridItem
+                    key={`${entry.cardId}-${entry.board}`}
+                    entry={entry}
+                    card={cards.get(entry.cardId)}
+                    proxy={entry.proxyId ? proxies.get(entry.proxyId) : undefined}
+                  />
+                ))}
+              </div>
+            ) : (
+              <ul className="divide-y divide-edge/60">
+                {list.map((entry) => (
+                  <DeckRow
+                    key={`${entry.cardId}-${entry.board}`}
+                    entry={entry}
+                    card={cards.get(entry.cardId)}
+                    proxy={entry.proxyId ? proxies.get(entry.proxyId) : undefined}
+                    onQty={onQty}
+                    onMove={onMove}
+                    onProxy={onProxy}
+                  />
+                ))}
+              </ul>
+            )}
           </div>
         )
       })}
@@ -273,12 +336,14 @@ function DeckBoard({
 function DeckRow({
   entry,
   card,
+  proxy,
   onQty,
   onMove,
   onProxy,
 }: {
   entry: DeckEntry
   card: Card | undefined
+  proxy: StoredProxy | undefined
   onQty: (entry: DeckEntry, delta: number) => void
   onMove: (entry: DeckEntry, board: Board) => void
   onProxy: (entry: DeckEntry, card: Card) => void
@@ -288,6 +353,8 @@ function DeckRow({
     { board: 'side', label: 'banda' },
     { board: 'command', label: 'mando' },
   ]
+
+  const displayName = proxy?.text.name || card?.name || entry.cardId
 
   return (
     <li className="group flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-edge/40">
@@ -312,20 +379,20 @@ function DeckRow({
       </div>
 
       <span className="min-w-0 flex-1 truncate" title={card?.type_line}>
-        {card?.name ?? entry.cardId}
+        {displayName}
       </span>
 
       {entry.proxyId && (
         <Link
           to={`/proxies/${entry.proxyId}`}
-          className="shrink-0 rounded border border-accent/50 px-1.5 text-[10px] text-accent"
+          className="shrink-0 rounded bg-accent/20 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent"
           title="Tiene un proxy"
         >
-          proxy
+          Proxy
         </Link>
       )}
 
-      <ManaCost cost={card?.mana_cost} />
+      <ManaCost cost={proxy?.text.mana || card?.mana_cost} />
 
       <span className="hidden shrink-0 items-center gap-1 group-hover:flex">
         {boards
@@ -351,5 +418,47 @@ function DeckRow({
         )}
       </span>
     </li>
+  )
+}
+
+/** Igual que `DeckRow` pero como carta: usa el proxy si lo tiene, si no la imagen de Scryfall. */
+function DeckGridItem({
+  entry,
+  card,
+  proxy,
+}: {
+  entry: DeckEntry
+  card: Card | undefined
+  proxy: StoredProxy | undefined
+}) {
+  const image = card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal
+  const displayName = proxy?.text.name || card?.name || entry.cardId
+
+  return (
+    <Link
+      to={proxy ? `/proxies/${proxy.id}` : '#'}
+      className={`group/card relative flex flex-col gap-1 ${proxy ? '' : 'pointer-events-none'}`}
+    >
+      <div className="relative overflow-hidden rounded-lg border border-edge bg-ink">
+        {proxy ? (
+          <CardPreview design={proxy} width={220} className="pointer-events-none w-full" />
+        ) : image ? (
+          <img src={image} alt={displayName} className="w-full" />
+        ) : (
+          <div className="flex aspect-[5/7] items-center justify-center px-2 text-center text-xs text-muted">
+            {displayName}
+          </div>
+        )}
+        <span className="absolute right-1 top-1 rounded-full bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+          {entry.qty}×
+        </span>
+        {proxy && (
+          <span className="absolute left-1 top-1 rounded bg-accent/90 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-black">
+            Proxy
+          </span>
+        )}
+      </div>
+      <span className="truncate text-center text-xs text-muted">{displayName}</span>
+    </Link>
   )
 }
