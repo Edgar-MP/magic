@@ -58,7 +58,21 @@ function cardAssets(): Plugin {
   }
 }
 
+/**
+ * En producción, un único servidor sirve la web y la API en el mismo origen, así
+ * que el cliente usa rutas relativas (`/v1`, `/api/auth`). En desarrollo son dos
+ * procesos, y sin este proxy esas rutas se quedarían en Vite: las cuentas y la
+ * sincronización no funcionarían con `pnpm dev`.
+ */
+const API = process.env.API_URL ?? 'http://localhost:3000'
+
 export default defineConfig({
   plugins: [react(), tailwind(), cardAssets()],
-  server: { port: 5173 },
+  server: {
+    port: 5173,
+    proxy: {
+      '/v1': { target: API, changeOrigin: false },
+      '/api/auth': { target: API, changeOrigin: false },
+    },
+  },
 })
