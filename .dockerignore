@@ -1,0 +1,17 @@
+# Se instala dentro de la imagen, y copiarlo desde el host rompería los binarios
+# nativos si el host no es Linux.
+node_modules
+**/node_modules
+
+# Todo lo generado se vuelve a generar dentro.
+**/dist
+packages/renderer/assets
+packages/web/public/card-index.json
+scripts/.cache
+*.tsbuildinfo
+
+.git
+.github
+README.md
+docs
+**/*.test.ts

@@ -8,7 +8,7 @@ guarda en el navegador (IndexedDB): no hay cuentas ni servidor.
 
 ```bash
 pnpm install
-pnpm assets        # marcos, tipografías y símbolos (~55 MB, una sola vez)
+pnpm assets        # marcos, tipografías y símbolos (~63 MB, una sola vez)
 pnpm cards:index   # índice de cartas para el autocompletado offline (~7 MB)
 pnpm dev           # http://localhost:5173
 ```
@@ -20,6 +20,16 @@ Los dos comandos del medio son opcionales pero conviene ejecutarlos:
 - **Sin `pnpm cards:index`** el buscador no autocompleta al teclear, pero al
   pulsar Enter sigue buscando en la API de Scryfall.
 
+## Desplegar
+
+```bash
+docker build -t magic .
+docker run --rm -p 3100:3000 magic   # http://localhost:3100
+```
+
+Un solo contenedor sirve la web, los marcos y la API. Los pasos de Dokploy y las
+variables de entorno están en [docs/despliegue.md](docs/despliegue.md).
+
 ## Qué hay dentro
 
 ```
@@ -28,6 +38,7 @@ packages/
   cards/      cliente de Scryfall (con cola de peticiones) y caché en Dexie
   renderer/   motor que compone las cartas capa a capa sobre un canvas
   web/        aplicación React + Vite
+  api/        servidor Hono: sirve la web compilada y los assets
 scripts/
   fetch-assets.ts      descarga marcos, tipografías y símbolos
   build-card-index.ts   genera el índice local desde el bulk data

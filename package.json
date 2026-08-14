@@ -2,9 +2,12 @@
   "name": "magic",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.9.0",
   "scripts": {
     "dev": "pnpm --filter @magic/web dev",
+    "dev:server": "pnpm --filter @magic/api dev",
     "build": "pnpm -r build",
+    "start": "pnpm --filter @magic/api start",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm -r typecheck",
