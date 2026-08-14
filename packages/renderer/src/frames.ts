@@ -276,8 +276,10 @@ export const PLANESWALKER = {
     x: 130 / 1500,
     y: 1925 / 2100 - 0.011,
     width: 0.7,
+    // Mismo tamaño que en el marco normal: se veía enano comparado con las
+    // demás cartas.
     height: 0.022,
-    size: 0.0155,
+    size: 0.0186,
     font: 'body' as const,
     color: '#ffffff',
   },

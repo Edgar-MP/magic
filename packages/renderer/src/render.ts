@@ -218,15 +218,18 @@ async function drawPlaneswalkerAbilities(
     const row = rows[i]
     if (!row) continue
 
-    // El hueco a la izquierda es el de la insignia de esta fila (más
-    // pequeña cuantas más habilidades hay), no un margen fijo: con un
-    // margen fijo, con 4-5 habilidades sobraba muchísimo hueco muerto.
+    // El texto empieza justo después de la insignia (que se dibuja pegada
+    // al borde izquierdo de la carta, no al de esta caja — por eso el punto
+    // de partida es `badgeX`, no `box.x`; sumar los dos duplicaba el hueco).
+    // Más pequeña cuantas más habilidades hay, así que el hueco se adapta.
     const badgeHeight = row.height * 0.62
-    const leftPad = scale.width * 0.03 + badgeHeight * 1.45 + scale.width * 0.008
+    const badgeX = scale.width * 0.03
+    const badgeWidth = badgeHeight * 1.4
+    const textStartX = badgeX + badgeWidth + scale.width * 0.025
     const rowBox: TextBox = {
-      x: (box.x + leftPad) / scale.width,
+      x: textStartX / scale.width,
       y: row.y / scale.height,
-      width: (box.x + box.width - (box.x + leftPad) - scale.width * 0.015) / scale.width,
+      width: (box.x + box.width - textStartX - scale.width * 0.015) / scale.width,
       height: row.height / scale.height,
       size: nominal / scale.height,
       font: 'body',
