@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #0f1115;
+  --color-panel: #181b22;
+  --color-edge: #262b35;
+  --color-muted: #8b93a3;
+  --color-accent: #c9a227;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-ink);
+  color: #e8eaee;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+/* Los números de las cantidades en las listas de mazo. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
