@@ -378,9 +378,19 @@ function DeckRow({
         </button>
       </div>
 
-      <span className="min-w-0 flex-1 truncate" title={card?.type_line}>
-        {displayName}
-      </span>
+      {entry.proxyId ? (
+        <Link
+          to={`/proxies/${entry.proxyId}`}
+          className="min-w-0 flex-1 truncate hover:text-accent hover:underline"
+          title="Editar el proxy"
+        >
+          {displayName}
+        </Link>
+      ) : (
+        <span className="min-w-0 flex-1 truncate" title={card?.type_line}>
+          {displayName}
+        </span>
+      )}
 
       {entry.proxyId && (
         <Link
@@ -413,7 +423,7 @@ function DeckRow({
             onClick={() => onProxy(entry, card)}
             className="rounded border border-edge px-1.5 text-[10px] text-muted hover:border-accent hover:text-white"
           >
-            proxear
+            {entry.proxyId ? 'editar proxy' : 'proxear'}
           </button>
         )}
       </span>

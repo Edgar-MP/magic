@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { db, getBlob } from '@magic/cards'
 import {
   CARD_VARIANTS,
@@ -15,7 +15,7 @@ import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
 import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
 import { deleteProxy, newId, useProxy } from '../lib/db-hooks.js'
-import { confirmLeave, useConfirmLeave } from '../lib/use-confirm-leave.js'
+import { useConfirmLeave } from '../lib/use-confirm-leave.js'
 
 type BasicSymbol = NonNullable<ProxyDesign['basicWatermark']>
 
@@ -70,7 +70,7 @@ export function ProxyEditor() {
     }
   }, [design, draft])
 
-  useConfirmLeave(dirty)
+  const goBack = useConfirmLeave(dirty)
 
   if (draft === undefined) return <p className="text-sm text-muted">Cargando…</p>
 
@@ -139,15 +139,13 @@ export function ProxyEditor() {
   return (
     <div className="flex flex-col gap-4">
       <header className="flex items-center justify-between gap-4">
-        <Link
-          to="/proxies"
-          onClick={(e) => {
-            if (!confirmLeave(dirty)) e.preventDefault()
-          }}
+        <button
+          type="button"
+          onClick={goBack}
           className="text-sm text-muted hover:text-white"
         >
-          ← Proxies
-        </Link>
+          ← Atrás
+        </button>
         <div className="flex flex-wrap items-center gap-2">
           {dirty && <span className="text-xs text-amber-300">Cambios sin guardar</span>}
           <button
