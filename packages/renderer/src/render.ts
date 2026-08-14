@@ -589,9 +589,10 @@ function drawOneLine(
 }
 
 /**
- * Etiqueta libre en una cajita bajo el nombre. La cajita se ajusta al texto y va
- * en oscuro translúcido: cae sobre la ilustración, así que sin fondo propio no
- * se leería según qué arte le toque.
+ * Etiqueta libre bajo el nombre, en cursiva, como el subtítulo que traen
+ * algunas cartas oficiales (un apodo, la carta de la que sale el proxy…).
+ * Va pegada al filo de abajo del título y con su mismo ancho: sigue la barra
+ * de arriba en vez de ser una pastilla suelta flotando en la ilustración.
  */
 function drawNote(
   ctx: CanvasRenderingContext2D,
@@ -608,19 +609,16 @@ function drawNote(
   const padding = nominal * 0.55
 
   ctx.save()
-  ctx.font = fontString(box, nominal)
+  ctx.font = fontString(box, nominal, true)
 
-  const { scaleX, fontSize: size, width: textWidth } = condenseToWidth(
+  const { scaleX, fontSize: size } = condenseToWidth(
     ctx.measureText(text).width,
     target.width - padding * 2,
     nominal,
   )
-  if (size !== nominal) ctx.font = fontString(box, size)
+  if (size !== nominal) ctx.font = fontString(box, size, true)
 
-  const pillWidth = Math.min(target.width, textWidth + padding * 2)
-  const pillX = target.x + (target.width - pillWidth) / 2
-
-  roundedRect(ctx, pillX, target.y, pillWidth, target.height, target.height * 0.35)
+  roundedRect(ctx, target.x, target.y, target.width, target.height, target.height * 0.3)
   ctx.fillStyle = 'rgba(0,0,0,0.62)'
   ctx.fill()
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'

@@ -81,13 +81,15 @@ export const M15: FrameSet = {
   basicWatermark: { x: 0.3267, y: 0.6491, width: 0.3474, height: 0.2496 },
 
   // Cae sobre la franja alta de la ilustración, entre el título y el arte.
+  // Pegada al filo de abajo del título, con su mismo ancho: es un banner que
+  // continúa la barra de arriba, no una etiqueta suelta flotando en el arte.
   note: {
     x: 0.0854,
-    y: 0.1216,
+    y: 0.1065,
     width: 0.8292,
     height: 0.0295,
-    size: 0.0207,
-    font: 'title',
+    size: 0.0195,
+    font: 'body',
     align: 'center',
     oneLine: true,
     middle: true,
