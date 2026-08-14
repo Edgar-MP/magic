@@ -20,15 +20,36 @@ Los dos comandos del medio son opcionales pero conviene ejecutarlos:
 - **Sin `pnpm cards:index`** el buscador no autocompleta al teclear, pero al
   pulsar Enter sigue buscando en la API de Scryfall.
 
+## Cuentas y sincronización
+
+**Entrar es opcional.** Sin cuenta todo funciona igual que siempre, guardado en
+este navegador. Con cuenta, los mazos, la colección, los proxies y sus
+ilustraciones se guardan en el servidor y los tienes en cualquier dispositivo.
+
+Sigue siendo local-first: IndexedDB es la fuente de verdad, así que funciona sin
+conexión y sincroniza cuando puede (al entrar, al volver la conexión o a mano).
+Los conflictos se resuelven con **el último que escribe gana**, comparando
+`updatedAt`; no hay fusión.
+
+Para desarrollar con la base de datos:
+
+```bash
+pnpm db:up        # Postgres en el 5463
+pnpm db:migrate   # aplica el esquema
+pnpm dev:server   # API en el 3000
+pnpm dev          # web en el 5173
+pnpm test:api     # tests de integración (necesitan el Postgres de arriba)
+```
+
 ## Desplegar
 
 ```bash
 docker build -t magic .
-docker run --rm -p 3100:3000 magic   # http://localhost:3100
 ```
 
-Un solo contenedor sirve la web, los marcos y la API. Los pasos de Dokploy y las
-variables de entorno están en [docs/despliegue.md](docs/despliegue.md).
+Un solo contenedor sirve la web, los marcos y la API, y aplica las migraciones al
+arrancar. Los pasos de Dokploy, las variables y las copias de seguridad están en
+[docs/despliegue.md](docs/despliegue.md).
 
 ## Qué hay dentro
 
@@ -38,7 +59,7 @@ packages/
   cards/      cliente de Scryfall (con cola de peticiones) y caché en Dexie
   renderer/   motor que compone las cartas capa a capa sobre un canvas
   web/        aplicación React + Vite
-  api/        servidor Hono: sirve la web compilada y los assets
+  api/        servidor Hono: cuentas, sincronización y la web compilada
 scripts/
   fetch-assets.ts      descarga marcos, tipografías y símbolos
   build-card-index.ts   genera el índice local desde el bulk data

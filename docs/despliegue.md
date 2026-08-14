@@ -23,22 +23,41 @@ Crear una **Application** (no un Compose) y rellenar:
 El puerto de la sección *Domains* sólo le dice a Traefik a dónde enrutar; no
 expone nada a internet por su cuenta.
 
-### Variables de entorno
+### Base de datos
 
-Ninguna es obligatoria: los valores por defecto de la imagen ya sirven.
-
-| Variable | Por defecto | Para qué |
-| --- | --- | --- |
-| `PORT` | `3000` | Puerto de escucha. Si se cambia, cambiar también el de *Domains*. |
-| `WEB_DIST` | `/app/web` | Web compilada dentro de la imagen. No tocar. |
-| `DATA_DIR` | `/data` | Datos persistentes. Sólo se usa a partir de la fase de cuentas. |
-| `NODE_ENV` | `production` | — |
+Crear un **Postgres** desde *Databases* en Dokploy y copiar su *Internal
+Connection URL* a la variable `DATABASE_URL` de la aplicación. Las migraciones se
+aplican solas al arrancar el contenedor (`prisma migrate deploy`), así que no hay
+que ejecutar nada a mano ni en el primer despliegue ni en los siguientes.
 
 ### Volumen
 
-Todavía no hace falta: sin cuentas no se guarda nada en el servidor. Cuando
-lleguen, en *Advanced → Volumes* se añade un **Volume Mount** montado en `/data`,
-que es donde irán las ilustraciones que sube la gente.
+En *Advanced → Volumes*, un **Volume Mount** montado en `/data`. Ahí van las
+ilustraciones que sube la gente; sin él se perderían en cada despliegue.
+
+### Variables de entorno
+
+| Variable | Obligatoria | Para qué |
+| --- | --- | --- |
+| `DATABASE_URL` | **Sí** | La *Internal Connection URL* del Postgres de Dokploy. |
+| `AUTH_SECRET` | **Sí** | Firma las cookies de sesión. Mínimo 32 caracteres: `openssl rand -base64 32`. Si cambia, se cierran todas las sesiones. |
+| `PUBLIC_URL` | No | La URL pública. Sin ella funciona igual (se deduce de cada petición) pero sale un aviso al arrancar. |
+| `PORT` | No | `3000` por defecto. Si se cambia, cambiar también el de *Domains*. |
+| `MAX_ART_BYTES` | No | Tamaño máximo por imagen. 10 MB por defecto. |
+| `MAX_ART_BYTES_PER_USER` | No | Espacio máximo por usuario. 200 MB por defecto. |
+| `WEB_DIST` / `DATA_DIR` | No | Rutas dentro de la imagen. No tocar. |
+
+El servidor se niega a arrancar en producción sin `AUTH_SECRET`, y sale con
+error si no puede conectar con la base de datos. Es a propósito: mejor que el
+despliegue falle claro y a la primera que descubrirlo cuando alguien intente
+entrar.
+
+### El registro está abierto
+
+Cualquiera con la URL puede crearse una cuenta y subir imágenes. Por eso hay
+cuotas: 10 MB por imagen y 200 MB por usuario, ajustables con las variables de
+arriba. Para cerrarlo del todo, lo más rápido es no publicar el dominio o poner
+autenticación básica en Traefik desde Dokploy.
 
 ## La compilación necesita internet
 
@@ -59,8 +78,13 @@ Enter). Un *Redeploy* en Dokploy lo regenera.
 ## Probar la imagen en local antes de subirla
 
 ```bash
+docker compose up -d          # Postgres de desarrollo, en el 5463
 docker build -t magic .
-docker run --rm -p 3100:3000 magic
+docker run --rm --network host \
+  -e PORT=3100 \
+  -e DATABASE_URL="postgresql://magic:magic@localhost:5463/magic" \
+  -e AUTH_SECRET="cualquier-cosa-de-mas-de-32-caracteres-aqui" \
+  magic
 
 curl -sf localhost:3100/v1/health                                  # {"status":"ok"}
 curl -sI localhost:3100/decks                                      # 200 text/html (fallback del SPA)
@@ -74,7 +98,17 @@ imagen: un `pnpm dev` los sirve por otro camino y no prueba lo mismo.
 
 ## Tamaño y tiempos
 
-La imagen ocupa unos **378 MB**, de los que 63 son los marcos y 7 el índice de
-cartas. Una compilación en frío tarda unos minutos, casi todo descargando los
+La imagen ocupa unos **640 MB**: 63 son los marcos, 7 el índice de cartas y casi
+200 los motores de Prisma, que hacen falta para aplicar las migraciones al
+arrancar. Una compilación en frío tarda unos minutos, casi todo descargando los
 assets; con la caché de capas de Docker, los cambios de código sólo repiten el
 paso de compilar.
+
+## Copias de seguridad
+
+Hay dos cosas que guardar y ninguna está en el código:
+
+- **Postgres**: mazos, colección, proxies y cuentas. Dokploy hace copias de sus
+  bases de datos desde su propia interfaz.
+- **El volumen `/data`**: las ilustraciones. Sin él, los proxies sincronizados
+  aparecen sin imagen.

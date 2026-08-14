@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { createApp } from './app.js'
-import type { Env } from './env.js'
+import { testEnv } from './test-env.js'
 
 /**
  * Pruebas de la aplicación entera con `app.request()`, sin abrir un puerto.
@@ -25,13 +25,7 @@ beforeAll(async () => {
   await writeFile(join(root, 'card-assets/m15/regular/m15FrameW.png'), 'png-de-mentira')
   await writeFile(join(root, 'card-index.json'), '[]')
 
-  const env: Env = {
-    NODE_ENV: 'test',
-    PORT: 3000,
-    WEB_DIST: root,
-    DATA_DIR: join(root, 'data'),
-  }
-  app = createApp(env)
+  app = createApp(testEnv({ WEB_DIST: root, DATA_DIR: join(root, 'data') }))
 })
 
 describe('salud', () => {

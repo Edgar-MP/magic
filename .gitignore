@@ -3,6 +3,9 @@ dist
 *.tsbuildinfo
 .DS_Store
 
+# Cliente de Prisma: lo genera `prisma generate` a partir del esquema.
+packages/api/generated
+
 # Assets de marcos, tipografías y símbolos: se descargan con `pnpm assets`.
 # No se versionan (son recreaciones de material con copyright de WotC/Adobe).
 packages/renderer/assets/

@@ -1,7 +1,20 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, getCards, loadCards } from '@magic/cards'
-import type { Card, Deck, Format, ProxyDesign } from '@magic/shared'
+import {
+  db,
+  getCards,
+  getDeck,
+  getProxy,
+  listCollection,
+  listDecks,
+  listProxies,
+  loadCards,
+  softDeleteCollectionItem,
+  softDeleteDeck,
+  softDeleteProxy,
+} from '@magic/cards'
+import type { Card, Format } from '@magic/shared'
 import { emptyDeck } from '@magic/shared'
+import type { StoredDeck, StoredProxy } from '@magic/cards'
 import { useEffect, useState } from 'react'
 
 /** Acceso a los datos locales. Dexie avisa solo cuando algo cambia. */
@@ -10,12 +23,12 @@ export function newId(): string {
   return crypto.randomUUID()
 }
 
-export function useDecks(): Deck[] | undefined {
-  return useLiveQuery(() => db.decks.orderBy('updatedAt').reverse().toArray(), [])
+export function useDecks(): StoredDeck[] | undefined {
+  return useLiveQuery(() => listDecks(), [])
 }
 
-export function useDeck(id: string | undefined): Deck | undefined {
-  return useLiveQuery(() => (id ? db.decks.get(id) : undefined), [id])
+export function useDeck(id: string | undefined): StoredDeck | undefined {
+  return useLiveQuery(() => (id ? getDeck(id) : undefined), [id])
 }
 
 export async function createDeck(name: string, format: Format): Promise<string> {
@@ -25,28 +38,36 @@ export async function createDeck(name: string, format: Format): Promise<string> 
   return deck.id
 }
 
-export async function saveDeck(deck: Deck): Promise<void> {
+export async function saveDeck(deck: StoredDeck): Promise<void> {
   await db.decks.put({ ...deck, updatedAt: Date.now() })
 }
 
+/**
+ * Los borrados son lógicos: el registro se queda marcado para que la
+ * sincronización pueda contárselo a los demás dispositivos.
+ */
 export async function deleteDeck(id: string): Promise<void> {
-  await db.decks.delete(id)
+  await softDeleteDeck(id)
 }
 
-export function useProxies(): ProxyDesign[] | undefined {
-  return useLiveQuery(() => db.proxies.orderBy('updatedAt').reverse().toArray(), [])
+export function useProxies(): StoredProxy[] | undefined {
+  return useLiveQuery(() => listProxies(), [])
 }
 
-export function useProxy(id: string | undefined): ProxyDesign | undefined {
-  return useLiveQuery(() => (id ? db.proxies.get(id) : undefined), [id])
+export function useProxy(id: string | undefined): StoredProxy | undefined {
+  return useLiveQuery(() => (id ? getProxy(id) : undefined), [id])
+}
+
+export async function deleteProxy(id: string): Promise<void> {
+  await softDeleteProxy(id)
 }
 
 export function useCollection() {
-  return useLiveQuery(() => db.collection.toArray(), [])
+  return useLiveQuery(() => listCollection(), [])
 }
 
 export async function setCollectionQty(cardId: string, qty: number): Promise<void> {
-  if (qty <= 0) await db.collection.delete(cardId)
+  if (qty <= 0) await softDeleteCollectionItem(cardId)
   else await db.collection.put({ cardId, qty, updatedAt: Date.now() })
 }
 

@@ -14,7 +14,7 @@ import { CardPreview } from '../components/CardPreview.js'
 import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
 import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
-import { newId, useProxy } from '../lib/db-hooks.js'
+import { deleteProxy, newId, useProxy } from '../lib/db-hooks.js'
 
 type BasicSymbol = NonNullable<ProxyDesign['basicWatermark']>
 
@@ -142,7 +142,7 @@ export function ProxyEditor() {
             type="button"
             onClick={() => {
               if (confirm('¿Borrar este proxy?')) {
-                void db.proxies.delete(design.id).then(() => navigate('/proxies'))
+                void deleteProxy(design.id).then(() => navigate('/proxies'))
               }
             }}
             className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-red-500 hover:text-red-400"

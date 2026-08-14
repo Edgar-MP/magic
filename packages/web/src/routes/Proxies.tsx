@@ -6,7 +6,7 @@ import { proxyFileSchema, type ProxyDesign } from '@magic/shared'
 import { CardSearch } from '../components/CardSearch.js'
 import { CardPreview } from '../components/CardPreview.js'
 import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
-import { newId, useProxies } from '../lib/db-hooks.js'
+import { deleteProxy, newId, useProxies } from '../lib/db-hooks.js'
 
 export function Proxies() {
   const proxies = useProxies()
@@ -149,7 +149,7 @@ export function Proxies() {
               <button
                 type="button"
                 onClick={() => {
-                  if (confirm(`¿Borrar «${design.text.name}»?`)) void db.proxies.delete(design.id)
+                  if (confirm(`¿Borrar «${design.text.name}»?`)) void deleteProxy(design.id)
                 }}
                 className="shrink-0 text-muted hover:text-red-400"
               >

@@ -8,8 +8,8 @@ FROM node:22-alpine AS base
 ENV PNPM_HOME=/pnpm \
     PATH=/pnpm:$PATH \
     COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-# La versión de pnpm sale del campo `packageManager` del package.json.
-RUN corepack enable
+# Prisma necesita openssl para hablar con Postgres; Alpine no lo trae de serie.
+RUN apk add --no-cache openssl && corepack enable
 WORKDIR /repo
 
 
@@ -46,6 +46,7 @@ RUN pnpm --filter @magic/api --prod --legacy deploy /out
 
 # --- Ejecución ----------------------------------------------------------------
 FROM node:22-alpine AS runtime
+RUN apk add --no-cache openssl
 ENV NODE_ENV=production \
     PORT=3000 \
     WEB_DIST=/app/web \
@@ -55,10 +56,15 @@ WORKDIR /app
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/package.json ./package.json
 COPY --from=build /repo/packages/api/dist ./dist
+# El cliente de Prisma se genera dentro del paquete, y el esquema y las
+# migraciones hacen falta para el `migrate deploy` del arranque.
+COPY --from=build /repo/packages/api/generated ./generated
+COPY --from=build /repo/packages/api/prisma ./prisma
+COPY --from=build /repo/packages/api/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --from=build /repo/packages/web/dist ./web
 
 # `node` es un usuario que ya trae la imagen oficial.
-RUN mkdir -p /data && chown -R node:node /data
+RUN chmod +x ./docker-entrypoint.sh && mkdir -p /data && chown -R node:node /data
 USER node
 
 EXPOSE 3000
@@ -67,4 +73,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
-CMD ["node", "dist/index.js"]
+CMD ["./docker-entrypoint.sh"]

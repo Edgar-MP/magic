@@ -1,0 +1,27 @@
+# Postgres para desarrollo y para los tests de integración. En el VPS no se usa:
+# allí la base de datos la crea Dokploy como servicio propio.
+#
+#   docker compose up -d
+#   DATABASE_URL=postgresql://magic:magic@localhost:5463/magic pnpm --filter @magic/api prisma:migrate
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: magic
+      POSTGRES_PASSWORD: magic
+      POSTGRES_DB: magic
+    ports:
+      # 5463 para no chocar con el de gym, que usa el 5462.
+      - '5463:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U magic']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:

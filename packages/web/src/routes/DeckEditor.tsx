@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { db } from '@magic/cards'
+import { db, getProxy } from '@magic/cards'
 import {
   FORMATS,
   FORMAT_LABELS,
@@ -74,7 +74,8 @@ export function DeckEditor() {
 
   /** Crea (o reutiliza) el proxy de esta carta y abre el editor. */
   const proxy = async (entry: DeckEntry, card: Card) => {
-    if (entry.proxyId && (await db.proxies.get(entry.proxyId))) {
+    // `getProxy` filtra los borrados: si el proxy se borró, se hace otro.
+    if (entry.proxyId && (await getProxy(entry.proxyId))) {
       navigate(`/proxies/${entry.proxyId}`)
       return
     }

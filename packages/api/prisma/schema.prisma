@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+  // Dentro del paquete y no en el node_modules de la raíz: así `pnpm deploy` se
+  // lo lleva a la imagen y no hay que regenerarlo en el arranque.
+  output   = "../generated/prisma"
+  // `native` para desarrollar aquí y el de Alpine para la imagen. Sin declararlo,
+  // Prisma intenta descargarse el motor al arrancar el contenedor, donde no tiene
+  // ni permisos de escritura ni por qué salir a internet.
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Cuentas (las tablas que espera better-auth) ------------------------------
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  displayName   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  sessions   Session[]
+  accounts   Account[]
+  decks      Deck[]
+  collection CollectionItem[]
+  proxies    Proxy[]
+  artBlobs   ArtBlob[]
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @db.Uuid
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(uuid()) @db.Uuid
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+// --- Datos de la aplicación ---------------------------------------------------
+//
+// El servidor nunca consulta por dentro de un mazo ni de un diseño de proxy: los
+// guarda como JSON con la misma forma que tienen en el navegador. Eso mantiene el
+// esquema pequeño y hace que añadir un campo al diseño no sea una migración.
+//
+// Los `id` los genera el cliente (`crypto.randomUUID()`), así que no llevan
+// `@default`: el mismo id identifica el registro en los dos lados.
+//
+// `updatedAt` tampoco es `@updatedAt`: manda el valor del cliente, porque es con
+// el que se resuelven los conflictos.
+//
+// `serverUpdatedAt` es la marca del servidor y es la que usa el `pull` como
+// cursor. Son dos relojes distintos a propósito: si el cursor dependiera del
+// reloj del cliente, un portátil tres minutos atrasado dejaría de recibir
+// cambios sin que nadie entendiera por qué.
+
+model Deck {
+  id              String    @id @db.Uuid
+  userId          String    @db.Uuid
+  name            String
+  format          String
+  entries         Json
+  notes           String?
+  createdAt       DateTime
+  updatedAt       DateTime
+  deletedAt       DateTime?
+  serverUpdatedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // El pull pide «lo que cambió después de X» para un usuario.
+  @@index([userId, serverUpdatedAt])
+}
+
+model CollectionItem {
+  userId          String    @db.Uuid
+  cardId          String
+  qty             Int
+  foil            Int?
+  updatedAt       DateTime
+  deletedAt       DateTime?
+  serverUpdatedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, cardId])
+  @@index([userId, serverUpdatedAt])
+}
+
+model Proxy {
+  id              String    @id @db.Uuid
+  userId          String    @db.Uuid
+  design          Json
+  artBlobId       String?   @db.Uuid
+  createdAt       DateTime
+  updatedAt       DateTime
+  deletedAt       DateTime?
+  serverUpdatedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, serverUpdatedAt])
+}
+
+/// Ilustración subida. El fichero vive en el volumen y la ruta se deriva del id
+/// y del usuario, no se guarda: una ruta en la base de datos es una ruta que
+/// alguien puede manipular.
+model ArtBlob {
+  id        String   @id @db.Uuid
+  userId    String   @db.Uuid
+  mime      String
+  size      Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

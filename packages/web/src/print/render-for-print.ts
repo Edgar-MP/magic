@@ -1,4 +1,4 @@
-import { db, getBlob } from '@magic/cards'
+import { getBlob, getProxy } from '@magic/cards'
 import { PRINT_WIDTH, renderCard, renderCardBack } from '@magic/renderer'
 import type { Card, Deck, ProxyDesign } from '@magic/shared'
 import { browserEnv } from '../env-browser.js'
@@ -95,7 +95,8 @@ export async function renderDeckForPrint(
     const name = card?.name ?? entry.cardId
 
     try {
-      const design = entry.proxyId ? await db.proxies.get(entry.proxyId) : undefined
+      // Un proxy borrado no se imprime: se cae a la imagen oficial de la carta.
+      const design = entry.proxyId ? await getProxy(entry.proxyId) : undefined
 
       if (design) {
         result.cards.push({ bytes: await renderProxyToPng(design), type: 'png', qty: entry.qty })

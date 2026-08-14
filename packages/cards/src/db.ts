@@ -12,8 +12,29 @@ export interface CachedCard {
   card: Card
 }
 
+/**
+ * Contabilidad de la sincronización. Vive aquí y no en `@magic/shared` porque es
+ * un detalle de cómo se guarda en este navegador, no del modelo de una carta.
+ */
+export interface SyncMeta {
+  /**
+   * Borrado lógico. Un borrado que no deja rastro no se puede propagar: el otro
+   * dispositivo volvería a subir el registro creyendo que es nuevo.
+   */
+  deletedAt?: number
+  /**
+   * Cuándo se subió por última vez. Está pendiente lo que cumple
+   * `updatedAt > (syncedAt ?? 0)`, así que no hace falta una tabla de salida y
+   * varios cambios seguidos se agrupan solos.
+   */
+  syncedAt?: number
+}
+
+export type StoredDeck = Deck & SyncMeta
+export type StoredProxy = ProxyDesign & SyncMeta
+
 /** Cuántas copias tiene el usuario de una impresión concreta. */
-export interface CollectionItem {
+export interface CollectionItem extends SyncMeta {
   cardId: string
   qty: number
   /** Copias en foil, informativo. */
@@ -22,7 +43,7 @@ export interface CollectionItem {
 }
 
 /** Blob guardado (imagen de arte subida, render cacheado). */
-export interface StoredBlob {
+export interface StoredBlob extends SyncMeta {
   id: string
   blob: Blob
   mime: string
@@ -31,12 +52,19 @@ export interface StoredBlob {
 
 const MONTH = 30 * 24 * 60 * 60 * 1000
 
+/** Ajustes sueltos que no merecen tabla propia, como el cursor de sincronización. */
+export interface MetaEntry {
+  key: string
+  value: unknown
+}
+
 export class MagicDB extends Dexie {
   cards!: EntityTable<CachedCard, 'id'>
-  decks!: EntityTable<Deck, 'id'>
+  decks!: EntityTable<StoredDeck, 'id'>
   collection!: EntityTable<CollectionItem, 'cardId'>
-  proxies!: EntityTable<ProxyDesign, 'id'>
+  proxies!: EntityTable<StoredProxy, 'id'>
   blobs!: EntityTable<StoredBlob, 'id'>
+  meta!: EntityTable<MetaEntry, 'key'>
 
   constructor(name = 'magic') {
     super(name)
@@ -61,6 +89,27 @@ export class MagicDB extends Dexie {
         }),
     )
 
+    // Los índices de la sincronización. Los campos nuevos no hacen falta
+    // rellenarlos: ausente significa «ni borrado ni subido nunca», que es justo
+    // lo que queremos para lo que ya había.
+    this.version(3).stores({
+      cards: 'id, name, oracle_id, set, cachedAt',
+      decks: 'id, name, format, updatedAt, syncedAt',
+      collection: 'cardId, updatedAt, syncedAt',
+      proxies: 'id, sourceCardId, updatedAt, syncedAt',
+      blobs: 'id, createdAt, syncedAt',
+    })
+
+    // Cursor de la sincronización y demás ajustes sueltos.
+    this.version(4).stores({
+      cards: 'id, name, oracle_id, set, cachedAt',
+      decks: 'id, name, format, updatedAt, syncedAt',
+      collection: 'cardId, updatedAt, syncedAt',
+      proxies: 'id, sourceCardId, updatedAt, syncedAt',
+      blobs: 'id, createdAt, syncedAt',
+      meta: 'key',
+    })
+
     // Red de seguridad para lo que no pase por la migración: un fichero .json
     // exportado con una versión antigua, o una pestaña que no se ha recargado.
     this.proxies.hook('reading', (proxy) => normalizeProxy(proxy))
@@ -68,10 +117,68 @@ export class MagicDB extends Dexie {
 }
 
 /**
+ * Lo borrado se queda en la tabla, así que **todas** las lecturas tienen que
+ * filtrarlo. Se hace en JS y no con un índice porque IndexedDB no indexa
+ * `undefined`: un `where('deletedAt').equals(null)` no devolvería nada.
+ */
+export function isAlive(record: SyncMeta): boolean {
+  return record.deletedAt == null
+}
+
+/** Mazos vivos, del más reciente al más antiguo. */
+export async function listDecks(): Promise<StoredDeck[]> {
+  const decks = await db.decks.orderBy('updatedAt').reverse().toArray()
+  return decks.filter(isAlive)
+}
+
+export async function getDeck(id: string): Promise<StoredDeck | undefined> {
+  const deck = await db.decks.get(id)
+  return deck && isAlive(deck) ? deck : undefined
+}
+
+export async function listProxies(): Promise<StoredProxy[]> {
+  const proxies = await db.proxies.orderBy('updatedAt').reverse().toArray()
+  return proxies.filter(isAlive)
+}
+
+export async function getProxy(id: string): Promise<StoredProxy | undefined> {
+  const proxy = await db.proxies.get(id)
+  return proxy && isAlive(proxy) ? proxy : undefined
+}
+
+export async function listCollection(): Promise<CollectionItem[]> {
+  const items = await db.collection.toArray()
+  return items.filter(isAlive)
+}
+
+/**
+ * Marca el registro como borrado en vez de quitarlo, y le sube el `updatedAt`
+ * para que la sincronización lo mande.
+ */
+export async function softDeleteDeck(id: string): Promise<void> {
+  const now = Date.now()
+  await db.decks.update(id, { deletedAt: now, updatedAt: now })
+}
+
+export async function softDeleteProxy(id: string): Promise<void> {
+  const now = Date.now()
+  await db.proxies.update(id, { deletedAt: now, updatedAt: now })
+}
+
+export async function softDeleteCollectionItem(cardId: string): Promise<void> {
+  const now = Date.now()
+  await db.collection.update(cardId, { deletedAt: now, updatedAt: now })
+}
+
+/**
  * Completa un proxy con los valores por defecto del esquema. Devuelve el mismo
  * objeto si ya estaba completo, para no crear basura en cada lectura.
  */
 export function normalizeProxy(proxy: ProxyDesign): ProxyDesign {
+  // El hook de lectura de Dexie también se dispara cuando no hay registro (un
+  // `get` de un id que no existe), así que aquí llega `undefined`.
+  if (proxy == null) return proxy
+
   if (proxy.variant !== undefined && proxy.edited !== undefined && proxy.text?.note !== undefined) {
     return proxy
   }
@@ -147,8 +254,11 @@ export async function getBlob(id: string): Promise<Blob | undefined> {
  * fotos de arte son lo más pesado que guardamos.
  */
 export async function pruneOrphanBlobs(): Promise<number> {
+  // Sólo cuentan los proxies vivos: la gracia de esto es liberar el espacio de
+  // los que se han borrado. La copia del servidor no se recoge, así que allí
+  // queda basura hasta que se implemente su propia limpieza.
   const used = new Set(
-    (await db.proxies.toArray()).map((p) => p.art.blobId).filter((id): id is string => !!id),
+    (await listProxies()).map((p) => p.art.blobId).filter((id): id is string => !!id),
   )
   const all = await db.blobs.toCollection().primaryKeys()
   const orphans = all.filter((id) => !used.has(id))

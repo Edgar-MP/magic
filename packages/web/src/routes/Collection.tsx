@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { db } from '@magic/cards'
+import { db, isAlive } from '@magic/cards'
 import { CardSearch } from '../components/CardSearch.js'
 import { ManaCost } from '../components/ManaCost.js'
 import {
@@ -47,8 +47,10 @@ export function Collection() {
 
       <CardSearch
         onPick={async (card) => {
+          // Si estaba borrada, cuenta como cero y vuelve a la vida con una copia.
           const current = await db.collection.get(card.id)
-          await setCollectionQty(card.id, (current?.qty ?? 0) + 1)
+          const qty = current && isAlive(current) ? current.qty : 0
+          await setCollectionQty(card.id, qty + 1)
         }}
         placeholder="Añadir carta a la colección…"
       />

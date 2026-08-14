@@ -1,4 +1,6 @@
 import { NavLink, Route, BrowserRouter as Router, Routes } from 'react-router-dom'
+import { AccountMenu } from './components/AccountMenu.js'
+import { useSync } from './lib/use-sync.js'
 import { Home } from './routes/Home.js'
 import { Decks } from './routes/Decks.js'
 import { DeckEditor } from './routes/DeckEditor.js'
@@ -14,6 +16,8 @@ const NAV = [
 ]
 
 export function App() {
+  const sync = useSync()
+
   return (
     <Router>
       <div className="flex min-h-full flex-col">
@@ -35,6 +39,9 @@ export function App() {
                 {item.label}
               </NavLink>
             ))}
+            <div className="ml-auto">
+              <AccountMenu status={sync} />
+            </div>
           </nav>
         </header>
 

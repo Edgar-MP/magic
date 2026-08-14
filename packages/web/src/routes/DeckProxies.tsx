@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { db, scryfall } from '@magic/cards'
+import { db, isAlive, scryfall, type StoredProxy } from '@magic/cards'
 import { cardToDesign } from '@magic/renderer'
 import type { Card, DeckEntry, ProxyDesign } from '@magic/shared'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -29,7 +29,10 @@ export function DeckProxies() {
   const proxies = useLiveQuery(
     async () => {
       const rows = await db.proxies.bulkGet(proxyIds)
-      return new Map(rows.filter((r): r is ProxyDesign => !!r).map((r) => [r.id, r]))
+      // Los borrados no cuentan: la carta vuelve a aparecer como «sin proxy».
+      return new Map(
+        rows.filter((r): r is StoredProxy => !!r && isAlive(r)).map((r) => [r.id, r]),
+      )
     },
     [proxyIds.join(',')],
     new Map<string, ProxyDesign>(),
