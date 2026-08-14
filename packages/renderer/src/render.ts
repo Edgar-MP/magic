@@ -222,7 +222,10 @@ async function drawPlaneswalkerAbilities(
     // al borde izquierdo de la carta, no al de esta caja — por eso el punto
     // de partida es `badgeX`, no `box.x`; sumar los dos duplicaba el hueco).
     // Más pequeña cuantas más habilidades hay, así que el hueco se adapta.
-    const badgeHeight = row.height * 0.8
+    // Con pocas habilidades (una o dos) la fila es muy alta: sin el tope, la
+    // insignia crecía sin límite y acababa siendo enorme, más grande que el
+    // propio texto de la habilidad.
+    const badgeHeight = Math.min(row.height * 0.8, scale.height * 0.068)
     const badgeX = scale.width * 0.03
     const badgeWidth = badgeHeight * 1.4
     const textStartX = badgeX + badgeWidth + scale.width * 0.025
@@ -284,7 +287,7 @@ async function drawPlaneswalkerBadges(
         : 'neutral'
     const pip = await env.loadAsset(paths.planeswalkerPip(sign)).catch(() => undefined)
 
-    const badgeHeight = row.height * 0.8
+    const badgeHeight = Math.min(row.height * 0.8, scale.height * 0.068)
     const badgeWidth = pip ? badgeHeight * (pip.width / pip.height) : badgeHeight * 1.4
     const badgeX = scale.width * 0.03
     const badgeY = row.y + row.height / 2 - badgeHeight / 2
