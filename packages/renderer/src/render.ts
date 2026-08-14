@@ -1,4 +1,4 @@
-import type { ProxyDesign } from '@magic/shared'
+import type { ArtPlacement, ProxyDesign } from '@magic/shared'
 import type { RenderEnv, Surface } from './env.js'
 import type { Box, FrameSet, TextBox, VariantSpec } from './frames.js'
 import {
@@ -39,28 +39,41 @@ export const PREVIEW_WIDTH = 750
 /** Ancho para imprimir: el nativo de los marcos, unos 800 dpi. */
 export const PRINT_WIDTH = 2010
 
-export async function renderCard(
+/**
+ * Todo lo que no es la ilustración, ya compuesto: marco, máscaras, cajas y
+ * textos, sobre fondo transparente.
+ *
+ * Existe para poder mover el arte sin recomponer la carta. Recomponerla cuesta
+ * (máscaras, capas y la bisección del autoajuste del texto), así que en el
+ * editor esto se calcula una vez y cada fotograma del arrastre sólo repinta el
+ * arte y vuelve a estampar esta capa encima.
+ */
+export interface CardLayers {
+  overlay: Surface
+  /** Ventana de arte de esta variante, en coordenadas normalizadas. */
+  artBox: Box
+  width: number
+  height: number
+}
+
+export async function renderCardLayers(
   design: ProxyDesign,
   env: RenderEnv,
-  { width = PREVIEW_WIDTH, background = '#000000', art }: RenderOptions = {},
-): Promise<Surface> {
+  { width = PREVIEW_WIDTH }: { width?: number } = {},
+): Promise<CardLayers> {
   const set = FRAME_SETS[design.frameSet] ?? M15
   const variant = VARIANTS[design.variant] ?? VARIANTS.regular
   const height = Math.round(width / set.aspect)
 
   await env.ensureFonts(['title', 'titleSmallCaps', 'body', 'bodyItalic'])
 
-  const surface = env.createSurface(width, height)
-  const { ctx } = surface
+  const overlay = env.createSurface(width, height)
+  const { ctx } = overlay
   ctx.imageSmoothingEnabled = true
   ctx.imageSmoothingQuality = 'high'
 
-  ctx.fillStyle = background
-  ctx.fillRect(0, 0, width, height)
-
   const scale = { width, height }
 
-  await drawArt(ctx, env, design, set, variant, scale, art ?? design.art.url)
   await drawFrame(ctx, env, design, set, variant, scale)
   await drawBasicWatermark(ctx, env, design, set, variant, scale)
   await drawLandSymbol(ctx, env, design, variant, scale)
@@ -72,6 +85,45 @@ export async function renderCard(
   const symbolWidthPx = await drawSetSymbol(ctx, env, design, set, variant, scale)
   await drawText(ctx, env, design, set, variant, scale, symbolWidthPx)
 
+  return { overlay, artBox: artBoxOf(set, variant.id), width, height }
+}
+
+/** Estampa fondo, ilustración y capa de marco sobre un contexto ya creado. */
+export function paintCard(
+  ctx: CanvasRenderingContext2D,
+  layers: CardLayers,
+  art: ArtImage | undefined,
+  placement: ArtPlacement,
+  background = '#000000',
+): void {
+  const { width, height } = layers
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+  ctx.clearRect(0, 0, width, height)
+
+  ctx.fillStyle = background
+  ctx.fillRect(0, 0, width, height)
+
+  if (art) paintArt(ctx, art, layers.artBox, placement, { width, height })
+
+  ctx.drawImage(layers.overlay.asImage(), 0, 0)
+}
+
+export async function renderCard(
+  design: ProxyDesign,
+  env: RenderEnv,
+  { width = PREVIEW_WIDTH, background = '#000000', art }: RenderOptions = {},
+): Promise<Surface> {
+  const layers = await renderCardLayers(design, env, { width })
+
+  const source = art ?? design.art.url
+  // Sin arte se sigue dibujando la carta: es útil ver el marco y el texto.
+  const image = source ? await env.loadImage(source).catch(() => undefined) : undefined
+
+  const surface = env.createSurface(layers.width, layers.height)
+  paintCard(surface.ctx, layers, image, design.art, background)
   return surface
 }
 
@@ -124,34 +176,28 @@ function px(box: Box, { width, height }: Scale) {
 
 // --- Capas -------------------------------------------------------------------
 
-async function drawArt(
+export type ArtImage = CanvasImageSource & { width: number; height: number }
+
+/**
+ * Dibuja la ilustración recortada a su ventana. Es síncrona a propósito: el
+ * arrastre en el editor la llama en cada fotograma con la imagen ya cargada.
+ */
+export function paintArt(
   ctx: CanvasRenderingContext2D,
-  env: RenderEnv,
-  design: ProxyDesign,
-  set: FrameSet,
-  variant: VariantSpec,
+  image: ArtImage,
+  artBox: Box,
+  placement: ArtPlacement,
   scale: Scale,
-  source: Blob | string | undefined,
-): Promise<void> {
-  if (!source) return
-
-  let image: CanvasImageSource & { width: number; height: number }
-  try {
-    image = await env.loadImage(source)
-  } catch {
-    // Sin arte se sigue dibujando la carta: es útil ver el marco y el texto.
-    return
-  }
-
-  const window_ = px(artBoxOf(set, variant.id), scale)
+): void {
+  const window_ = px(artBox, scale)
 
   // `scale: 1` es el zoom mínimo que cubre la ventana entera sin dejar huecos.
   const cover = Math.max(window_.width / image.width, window_.height / image.height)
-  const drawWidth = image.width * cover * design.art.scale
-  const drawHeight = image.height * cover * design.art.scale
+  const drawWidth = image.width * cover * placement.scale
+  const drawHeight = image.height * cover * placement.scale
 
-  const cx = window_.x + window_.width / 2 + design.art.x * window_.width
-  const cy = window_.y + window_.height / 2 + design.art.y * window_.height
+  const cx = window_.x + window_.width / 2 + placement.x * window_.width
+  const cy = window_.y + window_.height / 2 + placement.y * window_.height
 
   ctx.save()
   ctx.beginPath()
