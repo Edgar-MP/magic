@@ -1,0 +1,12 @@
+node_modules
+dist
+*.tsbuildinfo
+.DS_Store
+
+# Assets de marcos, tipografías y símbolos: se descargan con `pnpm assets`.
+# No se versionan (son recreaciones de material con copyright de WotC/Adobe).
+packages/renderer/assets/
+
+# Índice de cartas generado desde el bulk data de Scryfall.
+packages/web/public/card-index.json
+scripts/.cache/
