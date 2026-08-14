@@ -206,21 +206,34 @@ async function drawPlaneswalkerAbilities(
   ctx.restore()
 
   const nominal = scale.height * 0.0262
-  const textBox: TextBox = {
-    x: PLANESWALKER.abilities.x + 0.115,
-    y: 0,
-    width: PLANESWALKER.abilities.width - 0.13,
-    height: 0,
-    size: nominal / scale.height,
-    font: 'body',
-  }
+
+  // El texto no puede salirse de la caja de habilidades pase lo que pase
+  // (muchas habilidades, una muy larga…): se recorta al rectángulo.
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(box.x, box.y, box.width, box.height)
+  ctx.clip()
 
   for (const [i, ability] of design.abilities.entries()) {
     const row = rows[i]
     if (!row) continue
-    const tokens = tokenize(ability.text)
-    const rowBox = { ...textBox, y: row.y / scale.height, height: row.height / scale.height }
+
+    // El hueco a la izquierda es el de la insignia de esta fila (más
+    // pequeña cuantas más habilidades hay), no un margen fijo: con un
+    // margen fijo, con 4-5 habilidades sobraba muchísimo hueco muerto.
+    const badgeHeight = row.height * 0.62
+    const leftPad = scale.width * 0.03 + badgeHeight * 1.45 + scale.width * 0.008
+    const rowBox: TextBox = {
+      x: (box.x + leftPad) / scale.width,
+      y: row.y / scale.height,
+      width: (box.x + box.width - (box.x + leftPad) - scale.width * 0.015) / scale.width,
+      height: row.height / scale.height,
+      size: nominal / scale.height,
+      font: 'body',
+    }
     const rowPx = px(rowBox, scale)
+
+    const tokens = tokenize(ability.text)
     const measureText = (text: string, fontSize: number, italic: boolean) => {
       ctx.font = fontString(rowBox, fontSize, italic)
       return ctx.measureText(text).width
@@ -229,6 +242,10 @@ async function drawPlaneswalkerAbilities(
       width: rowPx.width,
       height: rowPx.height,
       fontSize: nominal,
+      // Con muchas habilidades la fila puede ser muy baja: hay que poder
+      // bajar bastante el cuerpo para que el texto quepa partido en líneas
+      // en vez de desbordar hacia la siguiente fila.
+      minFontSize: nominal * 0.3,
       measureText,
     })
     // Fila clara -> texto negro; fila oscura -> texto blanco. Si no, con la
@@ -242,6 +259,7 @@ async function drawPlaneswalkerAbilities(
       y += layout.lineHeight
     }
   }
+  ctx.restore()
 }
 
 async function drawPlaneswalkerBadges(

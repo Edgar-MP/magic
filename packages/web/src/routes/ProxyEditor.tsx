@@ -13,7 +13,7 @@ import {
 } from '@magic/shared'
 import { CardPreview } from '../components/CardPreview.js'
 import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
-import { RichRulesField } from '../components/RichRulesField.js'
+import { RichTextField } from '../components/RichTextField.js'
 import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
 import { deleteProxy, newId, useProxy } from '../lib/db-hooks.js'
@@ -229,7 +229,7 @@ export function ProxyEditor() {
             />
             <Field label="Tipo" value={draft.text.type} onChange={(v) => setText('type', v)} />
             {draft.layout === 'card' && (
-              <RichRulesField
+              <RichTextField
                 label="Texto de reglas"
                 value={draft.text.oracle}
                 onChange={(v) => setText('oracle', v)}
@@ -415,12 +415,13 @@ export function ProxyEditor() {
                       placeholder="+1"
                       className="h-fit w-14 shrink-0 rounded border border-edge bg-panel px-2 py-1 text-center text-sm outline-none focus:border-accent"
                     />
-                    <textarea
-                      value={ability.text}
-                      onChange={(e) => setAbility(i, { text: e.target.value })}
-                      rows={2}
-                      className="min-w-0 flex-1 rounded border border-edge bg-panel px-2 py-1 text-sm outline-none focus:border-accent"
-                    />
+                    <div className="min-w-0 flex-1">
+                      <RichTextField
+                        value={ability.text}
+                        onChange={(v) => setAbility(i, { text: v })}
+                        compact
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={() => removeAbility(i)}

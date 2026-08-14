@@ -4,22 +4,26 @@ import StarterKit from '@tiptap/starter-kit'
 import { docToText, textToHtml } from '../lib/rich-text.js'
 
 /**
- * El texto de reglas, con negrita y cursiva de verdad (botones, no escribir
+ * Campo de texto con negrita y cursiva de verdad (botones, no escribir
  * `**a mano**`). Por debajo se guarda como texto plano con ese mismo marcado:
- * es lo que ya entendía el renderizador de la carta, así que el proxy sigue
- * siendo un `string` normal y no hace falta tocar el esquema, la sincronización
- * ni la impresión.
+ * es lo que ya entiende el tokenizador del renderizador, así que el proxy
+ * sigue guardando un `string` normal en el campo que sea (reglas, la
+ * habilidad de un planeswalker…) — no hace falta tocar el esquema, la
+ * sincronización ni la impresión.
  */
-export function RichRulesField({
+export function RichTextField({
   label,
   value,
   onChange,
   hint,
+  compact,
 }: {
-  label: string
+  label?: string
   value: string
   onChange: (value: string) => void
   hint?: string
+  /** Para usarlo suelto dentro de una fila (la habilidad de un planeswalker). */
+  compact?: boolean
 }) {
   const editor = useEditor({
     extensions: [
@@ -41,8 +45,7 @@ export function RichRulesField({
     onUpdate: ({ editor }) => onChange(docToText(editor.getJSON())),
     editorProps: {
       attributes: {
-        class:
-          'min-h-24 rounded-b px-2 py-1.5 text-sm outline-none [&_p]:my-0.5 first:[&_p]:mt-0 last:[&_p]:mb-0',
+        class: `${compact ? 'min-h-12' : 'min-h-24'} rounded-b px-2 py-1.5 text-sm outline-none [&_p]:my-0.5 first:[&_p]:mt-0 last:[&_p]:mb-0`,
       },
     },
   })
@@ -57,28 +60,34 @@ export function RichRulesField({
 
   if (!editor) return null
 
+  const field = (
+    <div className="rounded border border-edge bg-ink focus-within:border-accent">
+      <div className="flex gap-1 border-b border-edge p-1">
+        <ToolbarButton
+          active={editor.isActive('bold')}
+          onClick={() => editor.chain().focus().toggleBold().run()}
+          title="Negrita"
+        >
+          <strong>N</strong>
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive('italic')}
+          onClick={() => editor.chain().focus().toggleItalic().run()}
+          title="Cursiva"
+        >
+          <em>K</em>
+        </ToolbarButton>
+      </div>
+      <EditorContent editor={editor} />
+    </div>
+  )
+
+  if (!label) return field
+
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs text-muted">{label}</span>
-      <div className="rounded border border-edge bg-ink focus-within:border-accent">
-        <div className="flex gap-1 border-b border-edge p-1">
-          <ToolbarButton
-            active={editor.isActive('bold')}
-            onClick={() => editor.chain().focus().toggleBold().run()}
-            title="Negrita"
-          >
-            <strong>N</strong>
-          </ToolbarButton>
-          <ToolbarButton
-            active={editor.isActive('italic')}
-            onClick={() => editor.chain().focus().toggleItalic().run()}
-            title="Cursiva"
-          >
-            <em>K</em>
-          </ToolbarButton>
-        </div>
-        <EditorContent editor={editor} />
-      </div>
+      {field}
       {hint && <span className="text-[11px] text-muted/70">{hint}</span>}
     </label>
   )
