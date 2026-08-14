@@ -613,15 +613,18 @@ function drawNote(
   ctx.save()
   ctx.font = fontString(box, nominal, true)
 
-  const { scaleX, fontSize: size } = condenseToWidth(
+  const { scaleX, fontSize: size, width: textWidth } = condenseToWidth(
     ctx.measureText(text).width,
     target.width - padding * 2,
     nominal,
   )
   if (size !== nominal) ctx.font = fontString(box, size, true)
 
-  roundedRect(ctx, target.x, target.y, target.width, target.height, target.height * 0.3)
-  ctx.fillStyle = 'rgba(0,0,0,0.72)'
+  const pillWidth = Math.min(target.width, textWidth + padding * 2)
+  const pillX = target.x + (target.width - pillWidth) / 2
+
+  roundedRect(ctx, pillX, target.y, pillWidth, target.height, target.height * 0.35)
+  ctx.fillStyle = 'rgba(0,0,0,0.62)'
   ctx.fill()
   // El borde va del color del marco: es lo que hace que la cajita se lea como
   // una continuación de la barra del nombre y no como un rótulo suelto.
