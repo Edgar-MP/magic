@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { db, getBlob } from '@magic/cards'
 import {
@@ -408,13 +408,51 @@ function Field({
   const shared =
     'rounded border border-edge bg-ink px-2 py-1.5 text-sm outline-none focus:border-accent'
 
+  // `value` viene de una live query a IndexedDB: llega de vuelta de forma
+  // asíncrona tras cada guardado. Si el input estuviera controlado
+  // directamente por ella, una respuesta que llega mientras se sigue
+  // escribiendo pisa el value y el navegador manda el cursor al final. Se
+  // guarda un estado local y sólo se resincroniza desde fuera cuando el
+  // campo no tiene el foco.
+  const [local, setLocal] = useState(value)
+  const focused = useRef(false)
+
+  useEffect(() => {
+    if (!focused.current) setLocal(value)
+  }, [value])
+
+  const handleChange = (next: string) => {
+    setLocal(next)
+    onChange(next)
+  }
+
+  const focusProps = {
+    onFocus: () => {
+      focused.current = true
+    },
+    onBlur: () => {
+      focused.current = false
+    },
+  }
+
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs text-muted">{label}</span>
       {rows ? (
-        <textarea rows={rows} value={value} onChange={(e) => onChange(e.target.value)} className={shared} />
+        <textarea
+          rows={rows}
+          value={local}
+          onChange={(e) => handleChange(e.target.value)}
+          className={shared}
+          {...focusProps}
+        />
       ) : (
-        <input value={value} onChange={(e) => onChange(e.target.value)} className={shared} />
+        <input
+          value={local}
+          onChange={(e) => handleChange(e.target.value)}
+          className={shared}
+          {...focusProps}
+        />
       )}
       {hint && <span className="text-[11px] text-muted/70">{hint}</span>}
     </label>
