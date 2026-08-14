@@ -237,19 +237,40 @@ export const PLANESWALKER = {
     oneLine: true,
     middle: true,
   },
-  /** Caja completa de habilidades: se reparte en tantas filas como haga falta. */
-  abilities: { x: 179 / 1500, y: 1314 / 2100, width: 1205 / 1500, height: 607 / 2100 },
+  /**
+   * Caja completa de habilidades: se reparte en tantas filas como haga falta.
+   * La altura se recorta antes de donde empieza de verdad el escudo de
+   * lealtad (comprobado a ojo en el PNG): con la altura completa de
+   * CardConjurer, la banda semitransparente de la última habilidad tapaba el
+   * escudo.
+   */
+  abilities: { x: 179 / 1500, y: 1314 / 2100, width: 1205 / 1500, height: (1865 - 1314) / 2100 },
+  /** Recalculado igual que el título: el escudo real está más arriba que 1954/2100. */
   loyalty: {
     x: 1209 / 1500,
-    y: 1954 / 2100,
+    y: 1925 / 2100 - 0.043 / 2,
     width: 210 / 1500,
-    height: 78 / 2100,
-    size: 78 / 2100,
+    height: 0.043,
+    size: 60 / 2100,
     font: 'titleSmallCaps' as const,
     align: 'center' as const,
     oneLine: true,
     middle: true,
   },
+  /** Etiqueta bajo el nombre: mismo hueco que en el marco normal, sobre el arte. */
+  note: {
+    x: 130 / 1500,
+    y: 0.104,
+    width: 1248 / 1500,
+    height: 0.0295,
+    size: 0.0207,
+    font: 'body' as const,
+    align: 'center' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /** Sello holográfico: misma fila que el escudo de lealtad, a su izquierda. */
+  holoStamp: { x: 0.42, y: 1925 / 2100 - 0.023, width: 0.128, height: 0.046 },
 }
 
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */

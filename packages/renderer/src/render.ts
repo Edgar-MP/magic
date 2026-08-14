@@ -124,6 +124,8 @@ async function renderPlaneswalkerLayers(
   drawOneLine(ctx, design.text.type, PLANESWALKER.type, scale, {
     maxWidth: PLANESWALKER.type.width * scale.width - symbolWidthPx,
   })
+  drawNote(ctx, design.text.note, PLANESWALKER.note, scale, FRAME_ACCENT[design.frameColor])
+  await drawPlaneswalkerStamp(ctx, env, design, scale)
   await drawPlaneswalkerAbilities(ctx, env, design, scale)
   await drawPlaneswalkerBadges(ctx, env, design, scale)
   drawOneLine(ctx, design.loyalty, PLANESWALKER.loyalty, scale, { color: '#ffffff' })
@@ -141,11 +143,26 @@ async function drawPlaneswalkerSetSymbol(
   const symbol = await env.loadImage(design.setSymbol).catch(() => undefined)
   if (!symbol) return 0
 
+  // `y` es el centro vertical (para que el símbolo quede alineado con la
+  // línea de tipo sea cual sea su forma), igual que en el marco normal.
   const box = px(PLANESWALKER.setSymbol, scale)
   const height = box.height
   const width = height * (symbol.width / symbol.height)
-  ctx.drawImage(symbol, box.x - width, box.y, width, height)
+  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
   return Math.max(0, PLANESWALKER.title.width * scale.width - (box.x - width - PLANESWALKER.title.x * scale.width))
+}
+
+async function drawPlaneswalkerStamp(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  if (!design.flags.stamp) return
+  const stamp = await env.loadAsset(paths.holoStamp(M15, design.frameColor)).catch(() => undefined)
+  if (!stamp) return
+  const target = px(PLANESWALKER.holoStamp, scale)
+  ctx.drawImage(stamp, target.x, target.y, target.width, target.height)
 }
 
 /**
@@ -173,7 +190,7 @@ async function drawPlaneswalkerAbilities(
 
   ctx.save()
   for (const [i, row] of rows.entries()) {
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)'
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'
     ctx.fillRect(box.x, row.y, box.width, row.height)
   }
   // Las líneas que separan una habilidad de la siguiente.

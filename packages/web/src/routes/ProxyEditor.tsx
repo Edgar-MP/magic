@@ -330,30 +330,34 @@ export function ProxyEditor() {
               )}
             </div>
 
-            {draft.layout === 'card' && (
-              <div className="flex flex-wrap gap-4 text-sm">
-                <Toggle
-                  label="Legendaria (corona)"
-                  checked={draft.flags.legendary}
-                  onChange={(v) => setFlag('legendary', v)}
-                />
-                <Toggle
-                  label="Nyx"
-                  checked={draft.flags.nyx}
-                  onChange={(v) => setFlag('nyx', v)}
-                />
-                <Toggle
-                  label="Sello de rara"
-                  checked={draft.flags.stamp}
-                  onChange={(v) => setFlag('stamp', v)}
-                />
+            <div className="flex flex-wrap gap-4 text-sm">
+              {draft.layout === 'card' && (
+                <>
+                  <Toggle
+                    label="Legendaria (corona)"
+                    checked={draft.flags.legendary}
+                    onChange={(v) => setFlag('legendary', v)}
+                  />
+                  <Toggle
+                    label="Nyx"
+                    checked={draft.flags.nyx}
+                    onChange={(v) => setFlag('nyx', v)}
+                  />
+                </>
+              )}
+              <Toggle
+                label="Sello de rara"
+                checked={draft.flags.stamp}
+                onChange={(v) => setFlag('stamp', v)}
+              />
+              {draft.layout === 'card' && (
                 <Toggle
                   label="Caja de F/R"
                   checked={draft.flags.showPt}
                   onChange={(v) => setFlag('showPt', v)}
                 />
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               {draft.layout === 'card' && (
