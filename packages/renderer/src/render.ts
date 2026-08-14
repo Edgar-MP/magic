@@ -449,7 +449,13 @@ async function drawText(
   if (info) drawInfoLine(ctx, design, info, scale)
 
   const rules = box('rules')
-  if (rules) await drawRules(ctx, env, design, set, variant, rules, scale)
+  if (rules) {
+    // Igual que el título deja hueco al coste, la caja de reglas deja hueco a
+    // la de fuerza/resistencia: si no, con texto largo (reglas + ambientación)
+    // la última línea acaba tocando el recuadro.
+    const reserved = pt && design.flags.showPt ? reservedRulesBox(rules, pt) : rules
+    await drawRules(ctx, env, design, set, variant, reserved, scale)
+  }
 }
 
 /** El ancho que le queda al título después del coste de maná. */
@@ -466,6 +472,23 @@ function reservedTitleWidth(
   const size = mana.size * scale.height
   const costWidth = symbols * size * 1.06
   return Math.max(width * 0.35, width - costWidth - size * 0.4)
+}
+
+/**
+ * La caja de fuerza/resistencia queda en la esquina inferior derecha, y la de
+ * reglas cubre casi todo el ancho hasta casi el mismo borde inferior: apenas
+ * quedan unos píxeles entre las dos. Con texto largo (reglas + ambientación),
+ * el autoajuste rellena la caja de reglas hasta el final y la última línea
+ * acaba pegada al recuadro. Se recorta la altura para dejar un hueco real.
+ */
+function reservedRulesBox(rules: TextBox, pt: TextBox): TextBox {
+  // Un margen de verdad, no sólo evitar el solape matemático: pegado al
+  // borde también se ve mal aunque técnicamente no se toquen.
+  const safeBottom = pt.y - pt.height * 0.4
+  const bottom = rules.y + rules.height
+  if (bottom <= safeBottom) return rules
+
+  return { ...rules, height: Math.max(0, safeBottom - rules.y) }
 }
 
 async function drawManaCost(
