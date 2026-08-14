@@ -12,6 +12,7 @@ import {
 } from '@magic/shared'
 import { CardPreview } from '../components/CardPreview.js'
 import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
+import { RichRulesField } from '../components/RichRulesField.js'
 import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
 import { deleteProxy, newId, useProxy } from '../lib/db-hooks.js'
@@ -215,11 +216,10 @@ export function ProxyEditor() {
               hint="Sale en una cajita sobre la ilustración. Por ejemplo la carta original, o «PROXY». Vacía no se dibuja."
             />
             <Field label="Tipo" value={draft.text.type} onChange={(v) => setText('type', v)} />
-            <Field
+            <RichRulesField
               label="Texto de reglas"
               value={draft.text.oracle}
               onChange={(v) => setText('oracle', v)}
-              rows={5}
               hint="Un salto de línea por habilidad. Los paréntesis salen en cursiva."
             />
             <Field

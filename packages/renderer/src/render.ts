@@ -761,6 +761,13 @@ async function drawLine(
     ctx.textBaseline = 'alphabetic'
     if (style.shadow) applyTextShadow(ctx, fontSize)
     ctx.fillText(item.value, cursor, baseline)
+    if (item.bold) {
+      // No hay un tipo de letra en negrita: se simula engrosando el trazo
+      // encima del mismo texto (el mismo truco que un «falso negrita» de CSS).
+      ctx.lineWidth = fontSize * 0.035
+      ctx.strokeStyle = ctx.fillStyle
+      ctx.strokeText(item.value, cursor, baseline)
+    }
     ctx.restore()
     cursor += item.width
   }

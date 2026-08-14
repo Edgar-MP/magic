@@ -5,10 +5,15 @@
  *  - símbolos entre llaves: `{T}`, `{2}`, `{W/U}`, `{X}`
  *  - texto recordatorio entre paréntesis, que va en cursiva
  *  - saltos de línea que separan habilidades
+ *
+ * A eso se suma el marcado que pone el editor de texto enriquecido (Tiptap):
+ *  - `**negrita**`, `*cursiva*`, `***negrita y cursiva***`
+ * Es la misma sintaxis que Markdown, para no inventar una propia; el editor
+ * la escribe y la lee (ver `RichRulesField`), aquí sólo se interpreta.
  */
 
 export type Token =
-  | { kind: 'text'; text: string; italic: boolean }
+  | { kind: 'text'; text: string; italic: boolean; bold: boolean }
   | { kind: 'symbol'; symbol: string }
   /** Fin de párrafo (una habilidad). */
   | { kind: 'break' }
@@ -18,6 +23,9 @@ export type Token =
 /** `{T}`, `{2}`, `{W/U}`, `{1000000}`, `{½}`, `{C}`, `{E}`… */
 const SYMBOL = /\{[^}]{1,10}\}/g
 
+/** Símbolo, o marcado de negrita/cursiva (el más largo primero: `***` antes que `**` o `*`). */
+const MARKUP = /\{[^}]{1,10}\}|\*\*\*([^*]+?)\*\*\*|\*\*([^*]+?)\*\*|\*([^*]+?)\*/g
+
 /**
  * Trocea una línea. `italic` arranca el trozo en cursiva (para el texto de
  * ambientación, que va entero en cursiva).
@@ -26,22 +34,43 @@ function tokenizeLine(line: string, italic: boolean): Token[] {
   const tokens: Token[] = []
 
   // Primero los paréntesis, que cambian la cursiva, y dentro de cada parte los
-  // símbolos. Se conservan los paréntesis: en las cartas reales se imprimen.
+  // símbolos y el marcado de negrita/cursiva. Se conservan los paréntesis: en
+  // las cartas reales se imprimen.
   for (const part of splitReminders(line)) {
     const partItalic = italic || part.reminder
     let last = 0
 
-    for (const match of part.text.matchAll(SYMBOL)) {
+    for (const match of part.text.matchAll(MARKUP)) {
       const at = match.index
       if (at > last) {
-        tokens.push({ kind: 'text', text: part.text.slice(last, at), italic: partItalic })
+        tokens.push({
+          kind: 'text',
+          text: part.text.slice(last, at),
+          italic: partItalic,
+          bold: false,
+        })
       }
-      tokens.push({ kind: 'symbol', symbol: match[0] })
-      last = at + match[0].length
+
+      const [whole, both, bold, plainItalic] = match
+      if (both !== undefined) {
+        tokens.push({ kind: 'text', text: both, italic: true, bold: true })
+      } else if (bold !== undefined) {
+        tokens.push({ kind: 'text', text: bold, italic: partItalic, bold: true })
+      } else if (plainItalic !== undefined) {
+        tokens.push({ kind: 'text', text: plainItalic, italic: true, bold: false })
+      } else {
+        tokens.push({ kind: 'symbol', symbol: whole })
+      }
+      last = at + whole.length
     }
 
     if (last < part.text.length) {
-      tokens.push({ kind: 'text', text: part.text.slice(last), italic: partItalic })
+      tokens.push({
+        kind: 'text',
+        text: part.text.slice(last),
+        italic: partItalic,
+        bold: false,
+      })
     }
   }
 

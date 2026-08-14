@@ -12,6 +12,7 @@ export interface Item {
   /** Texto, o el símbolo con llaves (`{T}`). */
   value: string
   italic: boolean
+  bold: boolean
   width: number
 }
 
@@ -115,7 +116,7 @@ export function layoutAt(tokens: Token[], options: LayoutOptions): LayoutResult 
     }
 
     if (token.kind === 'symbol') {
-      place({ kind: 'symbol', value: token.symbol, italic: false, width: symbolW })
+      place({ kind: 'symbol', value: token.symbol, italic: false, bold: false, width: symbolW })
       continue
     }
 
@@ -126,6 +127,7 @@ export function layoutAt(tokens: Token[], options: LayoutOptions): LayoutResult 
         kind: 'text',
         value: word,
         italic: token.italic,
+        bold: token.bold,
         width: measureText(word, fontSize, token.italic),
       })
     }
