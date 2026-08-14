@@ -128,6 +128,7 @@ async function renderPlaneswalkerLayers(
   await drawPlaneswalkerStamp(ctx, env, design, scale)
   await drawPlaneswalkerAbilities(ctx, env, design, scale)
   await drawPlaneswalkerBadges(ctx, env, design, scale)
+  drawInfoLine(ctx, design, PLANESWALKER.info, scale)
   drawOneLine(ctx, design.loyalty, PLANESWALKER.loyalty, scale, { color: '#ffffff' })
 
   return { overlay, artBox: PLANESWALKER.art, width, height }
@@ -230,10 +231,14 @@ async function drawPlaneswalkerAbilities(
       fontSize: nominal,
       measureText,
     })
+    // Fila clara -> texto negro; fila oscura -> texto blanco. Si no, con la
+    // banda a 0.5 de opacidad el negro sobre negro no se lee.
+    const style: DrawStyle = i % 2 === 0 ? {} : { color: '#ffffff' }
+
     let y = rowPx.y + Math.max(0, (rowPx.height - layout.height) / 2)
     for (const line of layout.lines) {
       y += line.spaceBefore
-      if (!line.divider) await drawLine(ctx, env, line, rowBox, layout.fontSize, rowPx.x, y)
+      if (!line.divider) await drawLine(ctx, env, line, rowBox, layout.fontSize, rowPx.x, y, style)
       y += layout.lineHeight
     }
   }

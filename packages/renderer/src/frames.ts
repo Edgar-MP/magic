@@ -271,6 +271,16 @@ export const PLANESWALKER = {
   },
   /** Sello holográfico: misma fila que el escudo de lealtad, a su izquierda. */
   holoStamp: { x: 0.42, y: 1925 / 2100 - 0.023, width: 0.128, height: 0.046 },
+  /** Artista e info: a la izquierda del escudo de lealtad, en la misma fila. */
+  info: {
+    x: 130 / 1500,
+    y: 1925 / 2100 - 0.011,
+    width: 0.7,
+    height: 0.022,
+    size: 0.0155,
+    font: 'body' as const,
+    color: '#ffffff',
+  },
 }
 
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */
