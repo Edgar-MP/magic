@@ -190,7 +190,7 @@ async function drawPlaneswalkerAbilities(
 
   ctx.save()
   for (const [i, row] of rows.entries()) {
-    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.12)'
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)'
     ctx.fillRect(box.x, row.y, box.width, row.height)
   }
   // Las líneas que separan una habilidad de la siguiente.
