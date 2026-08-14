@@ -20,10 +20,13 @@ const hasAssets = existsSync(join(assetDir, 'm15/regular/m15FrameR.png'))
 
 const design = (overrides: Partial<ProxyDesign> = {}): ProxyDesign => ({
   id: 'test',
+  layout: 'card',
   frameSet: 'm15',
   variant: 'regular',
   edited: false,
   frameColor: 'red',
+  loyalty: '',
+  abilities: [],
   flags: { legendary: false, nyx: false, stamp: false, showPt: false },
   art: { x: 0, y: 0, scale: 1 },
   text: {

@@ -6,6 +6,7 @@ import {
   FRAME_ACCENT,
   FRAME_SETS,
   M15,
+  PLANESWALKER,
   VARIANTS,
   artBoxOf,
   landSymbolPath,
@@ -62,6 +63,8 @@ export async function renderCardLayers(
   env: RenderEnv,
   { width = PREVIEW_WIDTH }: { width?: number } = {},
 ): Promise<CardLayers> {
+  if (design.layout === 'planeswalker') return renderPlaneswalkerLayers(design, env, { width })
+
   const set = FRAME_SETS[design.frameSet] ?? M15
   const variant = VARIANTS[design.variant] ?? VARIANTS.regular
   const height = Math.round(width / set.aspect)
@@ -87,6 +90,172 @@ export async function renderCardLayers(
   await drawText(ctx, env, design, set, variant, scale, symbolWidthPx)
 
   return { overlay, artBox: artBoxOf(set, variant.id), width, height }
+}
+
+/**
+ * Plantilla de planeswalker: sin fuerza/resistencia ni caja de reglas normal,
+ * con una caja de habilidades de lealtad (coste + texto, en filas) y un
+ * escudo con la lealtad inicial abajo a la derecha.
+ */
+async function renderPlaneswalkerLayers(
+  design: ProxyDesign,
+  env: RenderEnv,
+  { width = PREVIEW_WIDTH }: { width?: number } = {},
+): Promise<CardLayers> {
+  const height = Math.round(width / PLANESWALKER.aspect)
+
+  await env.ensureFonts(['title', 'titleSmallCaps', 'body', 'bodyItalic'])
+
+  const overlay = env.createSurface(width, height)
+  const { ctx } = overlay
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  const scale = { width, height }
+
+  const frame = await env.loadAsset(paths.planeswalkerFrame(design.frameColor)).catch(() => undefined)
+  if (frame) ctx.drawImage(frame, 0, 0, scale.width, scale.height)
+
+  const symbolWidthPx = await drawPlaneswalkerSetSymbol(ctx, env, design, scale)
+  drawOneLine(ctx, design.text.name, PLANESWALKER.title, scale, {
+    maxWidth: reservedTitleWidth(design, PLANESWALKER.title, PLANESWALKER.mana, scale),
+  })
+  await drawManaCost(ctx, env, design, PLANESWALKER.mana, scale)
+  drawOneLine(ctx, design.text.type, PLANESWALKER.type, scale, {
+    maxWidth: PLANESWALKER.type.width * scale.width - symbolWidthPx,
+  })
+  await drawPlaneswalkerAbilities(ctx, env, design, scale)
+  await drawPlaneswalkerBadges(ctx, env, design, scale)
+  drawOneLine(ctx, design.loyalty, PLANESWALKER.loyalty, scale, { color: '#ffffff' })
+
+  return { overlay, artBox: PLANESWALKER.art, width, height }
+}
+
+async function drawPlaneswalkerSetSymbol(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<number> {
+  if (!design.setSymbol) return 0
+  const symbol = await env.loadImage(design.setSymbol).catch(() => undefined)
+  if (!symbol) return 0
+
+  const box = px(PLANESWALKER.setSymbol, scale)
+  const height = box.height
+  const width = height * (symbol.width / symbol.height)
+  ctx.drawImage(symbol, box.x - width, box.y, width, height)
+  return Math.max(0, PLANESWALKER.title.width * scale.width - (box.x - width - PLANESWALKER.title.x * scale.width))
+}
+
+/**
+ * Las filas de habilidades se reparten a partes iguales dentro de la caja: no
+ * es exactamente el reparto fino de las cartas reales (que ajustan cada fila a
+ * mano), pero con 2 a 5 habilidades da un resultado casi idéntico y no hace
+ * falta que cada proxy calibre la altura de cada una.
+ */
+function planeswalkerRows(design: ProxyDesign, scale: Scale): { y: number; height: number }[] {
+  const box = px(PLANESWALKER.abilities, scale)
+  const count = Math.max(1, design.abilities.length)
+  const rowHeight = box.height / count
+  return design.abilities.map((_, i) => ({ y: box.y + i * rowHeight, height: rowHeight }))
+}
+
+async function drawPlaneswalkerAbilities(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  if (design.abilities.length === 0) return
+  const box = px(PLANESWALKER.abilities, scale)
+  const rows = planeswalkerRows(design, scale)
+
+  ctx.save()
+  for (const [i, row] of rows.entries()) {
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)'
+    ctx.fillRect(box.x, row.y, box.width, row.height)
+  }
+  // Las líneas que separan una habilidad de la siguiente.
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)'
+  ctx.lineWidth = Math.max(1, scale.height * 0.0015)
+  for (const row of rows.slice(1)) {
+    ctx.beginPath()
+    ctx.moveTo(box.x, row.y)
+    ctx.lineTo(box.x + box.width, row.y)
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  const nominal = scale.height * 0.0262
+  const textBox: TextBox = {
+    x: PLANESWALKER.abilities.x + 0.115,
+    y: 0,
+    width: PLANESWALKER.abilities.width - 0.13,
+    height: 0,
+    size: nominal / scale.height,
+    font: 'body',
+  }
+
+  for (const [i, ability] of design.abilities.entries()) {
+    const row = rows[i]
+    if (!row) continue
+    const tokens = tokenize(ability.text)
+    const rowBox = { ...textBox, y: row.y / scale.height, height: row.height / scale.height }
+    const rowPx = px(rowBox, scale)
+    const measureText = (text: string, fontSize: number, italic: boolean) => {
+      ctx.font = fontString(rowBox, fontSize, italic)
+      return ctx.measureText(text).width
+    }
+    const layout = layoutAutofit(tokens, {
+      width: rowPx.width,
+      height: rowPx.height,
+      fontSize: nominal,
+      measureText,
+    })
+    let y = rowPx.y + Math.max(0, (rowPx.height - layout.height) / 2)
+    for (const line of layout.lines) {
+      y += line.spaceBefore
+      if (!line.divider) await drawLine(ctx, env, line, rowBox, layout.fontSize, rowPx.x, y)
+      y += layout.lineHeight
+    }
+  }
+}
+
+async function drawPlaneswalkerBadges(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  const rows = planeswalkerRows(design, scale)
+
+  for (const [i, ability] of design.abilities.entries()) {
+    const row = rows[i]
+    if (!row) continue
+
+    const sign = ability.cost.trim().startsWith('+')
+      ? 'plus'
+      : ability.cost.trim().startsWith('-') || ability.cost.trim().startsWith('−')
+        ? 'minus'
+        : 'neutral'
+    const pip = await env.loadAsset(paths.planeswalkerPip(sign)).catch(() => undefined)
+
+    const badgeHeight = row.height * 0.62
+    const badgeWidth = pip ? badgeHeight * (pip.width / pip.height) : badgeHeight * 1.4
+    const badgeX = scale.width * 0.03
+    const badgeY = row.y + row.height / 2 - badgeHeight / 2
+
+    if (pip) ctx.drawImage(pip, badgeX, badgeY, badgeWidth, badgeHeight)
+
+    ctx.save()
+    ctx.font = `${badgeHeight * 0.52}px "${FONT_FAMILY.titleSmallCaps}"`
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(ability.cost, badgeX + badgeWidth / 2, row.y + row.height / 2 + badgeHeight * 0.18)
+    ctx.restore()
+  }
 }
 
 /** Estampa fondo, ilustración y capa de marco sobre un contexto ya creado. */

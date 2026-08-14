@@ -7,6 +7,7 @@ import {
   FRAME_COLORS,
   type CardVariant,
   type FrameColor,
+  type PlaneswalkerAbility,
   type ProxyDesign,
   type ProxyFile,
 } from '@magic/shared'
@@ -85,6 +86,17 @@ export function ProxyEditor() {
 
   const setFlag = (key: keyof ProxyDesign['flags'], value: boolean) =>
     update({ flags: { ...draft.flags, [key]: value } })
+
+  const setAbility = (index: number, changes: Partial<PlaneswalkerAbility>) =>
+    update({
+      abilities: draft.abilities.map((a, i) => (i === index ? { ...a, ...changes } : a)),
+    })
+
+  const addAbility = () =>
+    update({ abilities: [...draft.abilities, { cost: '+1', text: '' }] })
+
+  const removeAbility = (index: number) =>
+    update({ abilities: draft.abilities.filter((_, i) => i !== index) })
 
   /**
    * Marca el proxy como editado: es lo que permite ir por un mazo entero
@@ -216,20 +228,26 @@ export function ProxyEditor() {
               hint="Sale en una cajita sobre la ilustración. Por ejemplo la carta original, o «PROXY». Vacía no se dibuja."
             />
             <Field label="Tipo" value={draft.text.type} onChange={(v) => setText('type', v)} />
-            <RichRulesField
-              label="Texto de reglas"
-              value={draft.text.oracle}
-              onChange={(v) => setText('oracle', v)}
-              hint="Un salto de línea por habilidad. Los paréntesis salen en cursiva."
-            />
-            <Field
-              label="Ambientación"
-              value={draft.text.flavor}
-              onChange={(v) => setText('flavor', v)}
-              rows={2}
-            />
+            {draft.layout === 'card' && (
+              <RichRulesField
+                label="Texto de reglas"
+                value={draft.text.oracle}
+                onChange={(v) => setText('oracle', v)}
+                hint="Un salto de línea por habilidad. Los paréntesis salen en cursiva."
+              />
+            )}
+            {draft.layout === 'card' && (
+              <Field
+                label="Ambientación"
+                value={draft.text.flavor}
+                onChange={(v) => setText('flavor', v)}
+                rows={2}
+              />
+            )}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Fuerza/Resistencia" value={draft.text.pt} onChange={(v) => setText('pt', v)} />
+              {draft.layout === 'card' && (
+                <Field label="Fuerza/Resistencia" value={draft.text.pt} onChange={(v) => setText('pt', v)} />
+              )}
               <Field label="Artista" value={draft.text.artist} onChange={(v) => setText('artist', v)} />
             </div>
             <Field
@@ -241,27 +259,35 @@ export function ProxyEditor() {
           </Section>
 
           <Section title="Marco">
-            <label className="flex flex-col gap-1 text-sm">
-              <span className="text-xs text-muted">Variante</span>
-              <select
-                value={draft.variant}
-                onChange={(e) => update({ variant: e.target.value as CardVariant })}
-                className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
-              >
-                {CARD_VARIANTS.map((v) => (
-                  <option key={v} value={v}>
-                    {CARD_VARIANT_LABELS[v]}
-                  </option>
-                ))}
-              </select>
-              <span className="text-[11px] text-muted/70">
-                {draft.variant === 'regular' && 'La carta de siempre, con su borde negro.'}
-                {draft.variant === 'extendedArt' &&
-                  'La caja de texto es transparente y se ve la ilustración por detrás.'}
-                {draft.variant === 'borderless' &&
-                  'La ilustración llega a los cuatro cantos. Sin corona de legendaria.'}
-              </span>
-            </label>
+            <Toggle
+              label="Planeswalker (lealtad y habilidades)"
+              checked={draft.layout === 'planeswalker'}
+              onChange={(v) => update({ layout: v ? 'planeswalker' : 'card' })}
+            />
+
+            {draft.layout === 'card' && (
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-xs text-muted">Variante</span>
+                <select
+                  value={draft.variant}
+                  onChange={(e) => update({ variant: e.target.value as CardVariant })}
+                  className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
+                >
+                  {CARD_VARIANTS.map((v) => (
+                    <option key={v} value={v}>
+                      {CARD_VARIANT_LABELS[v]}
+                    </option>
+                  ))}
+                </select>
+                <span className="text-[11px] text-muted/70">
+                  {draft.variant === 'regular' && 'La carta de siempre, con su borde negro.'}
+                  {draft.variant === 'extendedArt' &&
+                    'La caja de texto es transparente y se ve la ilustración por detrás.'}
+                  {draft.variant === 'borderless' &&
+                    'La ilustración llega a los cuatro cantos. Sin corona de legendaria.'}
+                </span>
+              </label>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
@@ -279,79 +305,85 @@ export function ProxyEditor() {
                 </select>
               </label>
 
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs text-muted">Segundo color (híbrida)</span>
-                <select
-                  value={draft.secondColor ?? ''}
-                  onChange={(e) =>
-                    update(
-                      e.target.value === ''
-                        ? { secondColor: undefined }
-                        : { secondColor: e.target.value as FrameColor },
-                    )
-                  }
-                  className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
-                >
-                  <option value="">Ninguno</option>
-                  {FRAME_COLORS.map((c) => (
-                    <option key={c} value={c}>
-                      {FRAME_LABELS[c]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {draft.layout === 'card' && (
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs text-muted">Segundo color (híbrida)</span>
+                  <select
+                    value={draft.secondColor ?? ''}
+                    onChange={(e) =>
+                      update(
+                        e.target.value === ''
+                          ? { secondColor: undefined }
+                          : { secondColor: e.target.value as FrameColor },
+                      )
+                    }
+                    className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
+                  >
+                    <option value="">Ninguno</option>
+                    {FRAME_COLORS.map((c) => (
+                      <option key={c} value={c}>
+                        {FRAME_LABELS[c]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
 
-            <div className="flex flex-wrap gap-4 text-sm">
-              <Toggle
-                label="Legendaria (corona)"
-                checked={draft.flags.legendary}
-                onChange={(v) => setFlag('legendary', v)}
-              />
-              <Toggle
-                label="Nyx"
-                checked={draft.flags.nyx}
-                onChange={(v) => setFlag('nyx', v)}
-              />
-              <Toggle
-                label="Sello de rara"
-                checked={draft.flags.stamp}
-                onChange={(v) => setFlag('stamp', v)}
-              />
-              <Toggle
-                label="Caja de F/R"
-                checked={draft.flags.showPt}
-                onChange={(v) => setFlag('showPt', v)}
-              />
-            </div>
+            {draft.layout === 'card' && (
+              <div className="flex flex-wrap gap-4 text-sm">
+                <Toggle
+                  label="Legendaria (corona)"
+                  checked={draft.flags.legendary}
+                  onChange={(v) => setFlag('legendary', v)}
+                />
+                <Toggle
+                  label="Nyx"
+                  checked={draft.flags.nyx}
+                  onChange={(v) => setFlag('nyx', v)}
+                />
+                <Toggle
+                  label="Sello de rara"
+                  checked={draft.flags.stamp}
+                  onChange={(v) => setFlag('stamp', v)}
+                />
+                <Toggle
+                  label="Caja de F/R"
+                  checked={draft.flags.showPt}
+                  onChange={(v) => setFlag('showPt', v)}
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
-              <label className="flex flex-col gap-1 text-sm">
-                <span className="text-xs text-muted">Símbolo de tierra básica</span>
-                <select
-                  value={draft.basicWatermark ?? ''}
-                  onChange={(e) =>
-                    update(
-                      e.target.value === ''
-                        ? { basicWatermark: undefined }
-                        : { basicWatermark: e.target.value as BasicSymbol },
-                    )
-                  }
-                  className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
-                >
-                  <option value="">Ninguno</option>
-                  {BASIC_SYMBOLS.map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-[11px] text-muted/70">
-                  {draft.variant === 'fullArtLand'
-                    ? 'El círculo de maná de abajo a la izquierda.'
-                    : 'La marca de agua grande de la caja de texto.'}
-                </span>
-              </label>
+              {draft.layout === 'card' && (
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-xs text-muted">Símbolo de tierra básica</span>
+                  <select
+                    value={draft.basicWatermark ?? ''}
+                    onChange={(e) =>
+                      update(
+                        e.target.value === ''
+                          ? { basicWatermark: undefined }
+                          : { basicWatermark: e.target.value as BasicSymbol },
+                      )
+                    }
+                    className="rounded border border-edge bg-ink px-2 py-1.5 outline-none focus:border-accent"
+                  >
+                    <option value="">Ninguno</option>
+                    {BASIC_SYMBOLS.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="text-[11px] text-muted/70">
+                    {draft.variant === 'fullArtLand'
+                      ? 'El círculo de maná de abajo a la izquierda.'
+                      : 'La marca de agua grande de la caja de texto.'}
+                  </span>
+                </label>
+              )}
 
               <Field
                 label="Símbolo de expansión (URL)"
@@ -361,6 +393,50 @@ export function ProxyEditor() {
               />
             </div>
           </Section>
+
+          {draft.layout === 'planeswalker' && (
+            <Section title="Lealtad">
+              <Field
+                label="Lealtad inicial"
+                value={draft.loyalty}
+                onChange={(v) => update({ loyalty: v })}
+              />
+
+              <div className="flex flex-col gap-2">
+                {draft.abilities.map((ability, i) => (
+                  <div key={i} className="flex gap-2 rounded border border-edge bg-ink p-2">
+                    <input
+                      value={ability.cost}
+                      onChange={(e) => setAbility(i, { cost: e.target.value })}
+                      placeholder="+1"
+                      className="h-fit w-14 shrink-0 rounded border border-edge bg-panel px-2 py-1 text-center text-sm outline-none focus:border-accent"
+                    />
+                    <textarea
+                      value={ability.text}
+                      onChange={(e) => setAbility(i, { text: e.target.value })}
+                      rows={2}
+                      className="min-w-0 flex-1 rounded border border-edge bg-panel px-2 py-1 text-sm outline-none focus:border-accent"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeAbility(i)}
+                      className="h-fit shrink-0 rounded border border-edge px-2 py-1 text-xs text-muted hover:border-red-500 hover:text-red-400"
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addAbility}
+                className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+              >
+                Añadir habilidad
+              </button>
+            </Section>
+          )}
         </div>
       </div>
 

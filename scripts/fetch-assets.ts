@@ -114,6 +114,21 @@ function manifest(): [string, string][] {
   // Reverso clásico de Magic.
   add('img/frames/cardbacks/cardback.png', 'cardbacks/cardback.png')
 
+  // Planeswalker: marco por color (sólo siete, no hay tierra ni vehículo) y
+  // las insignias de lealtad (+/−/neutral) que van pegadas a cada habilidad.
+  for (const c of ['W', 'U', 'B', 'R', 'G', 'M', 'A']) {
+    files.push([
+      `data/images/cardImages/planeswalker/planeswalkerFrame${c}.png`,
+      `planeswalker/planeswalkerFrame${c}.png`,
+    ])
+  }
+  for (const pip of ['Plus', 'Minus', 'Neutral']) {
+    files.push([
+      `data/images/cardImages/planeswalker/planeswalker${pip}.png`,
+      `planeswalker/planeswalker${pip}.png`,
+    ])
+  }
+
   // Tipografías: Beleren para títulos y tipos, MPlantin para el texto de reglas.
   for (const font of [
     'beleren-b.ttf',

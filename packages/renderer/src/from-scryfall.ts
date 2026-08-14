@@ -1,4 +1,4 @@
-import type { Card, Color, FrameColor, ProxyDesign } from '@magic/shared'
+import type { Card, Color, FrameColor, PlaneswalkerAbility, ProxyDesign } from '@magic/shared'
 import { hasType, isBasicLand, isLegendary } from '@magic/shared'
 
 /**
@@ -89,6 +89,26 @@ function ptOf(card: Card): string {
   return `${power}/${toughness}`
 }
 
+/**
+ * El oracle de un planeswalker es una habilidad por línea, cada una con su
+ * coste de lealtad delante (`+1: …`, `−3: …`, `0: …`). Scryfall usa el signo
+ * menos de verdad (`−`, U+2212), no un guion.
+ */
+const ABILITY_LINE = /^([+−-]?(?:X|\d+))\s*:\s*(.+)$/su
+
+function planeswalkerAbilitiesOf(card: Card): PlaneswalkerAbility[] {
+  const oracle = card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? ''
+  const abilities: PlaneswalkerAbility[] = []
+
+  for (const line of oracle.split('\n')) {
+    const match = ABILITY_LINE.exec(line.trim())
+    if (match?.[1] && match[2]) {
+      abilities.push({ cost: match[1].replace('−', '-'), text: match[2] })
+    }
+  }
+  return abilities
+}
+
 /** Línea inferior: `M10 · 146 · ES`, como la de las cartas reales. */
 function infoLine(card: Card): string {
   return [card.set.toUpperCase(), card.collector_number, card.rarity?.[0]?.toUpperCase()]
@@ -111,6 +131,9 @@ export function cardToDesign(
   const frame = chooseFrame(card)
   const pt = ptOf(card)
   const watermark = basicWatermarkOf(card)
+  const planeswalker = hasType(card, 'Planeswalker')
+  const abilities = planeswalker ? planeswalkerAbilitiesOf(card) : []
+  const loyalty = card.loyalty ?? face?.loyalty ?? ''
 
   const artUrl = useOfficialArt
     ? (card.image_uris?.art_crop ?? face?.image_uris?.art_crop)
@@ -119,6 +142,7 @@ export function cardToDesign(
   return {
     id,
     sourceCardId: card.id,
+    layout: planeswalker ? 'planeswalker' : 'card',
     frameSet: 'm15',
     variant: 'regular',
     edited: false,
@@ -153,6 +177,8 @@ export function cardToDesign(
       artist: card.artist ?? face?.artist ?? '',
       info: infoLine(card),
     },
+    loyalty,
+    abilities,
     createdAt: now,
     updatedAt: now,
   }

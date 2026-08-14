@@ -93,10 +93,26 @@ export const proxyFlagsSchema = z.object({
 })
 export type ProxyFlags = z.infer<typeof proxyFlagsSchema>
 
+/** Una habilidad de lealtad: `+1`, `-3`, `0`… y su texto. */
+export const planeswalkerAbilitySchema = z.object({
+  cost: z.string().default('+1'),
+  text: z.string().default(''),
+})
+export type PlaneswalkerAbility = z.infer<typeof planeswalkerAbilitySchema>
+
+/**
+ * `card` es la plantilla normal (criatura/hechizo/tierra…); `planeswalker`
+ * cambia a la caja de habilidades con coste de lealtad. No hay más plantillas
+ * especiales todavía (saga, class, battle…), pero el campo ya deja sitio.
+ */
+export const CARD_LAYOUTS = ['card', 'planeswalker'] as const
+export type CardLayout = (typeof CARD_LAYOUTS)[number]
+
 export const proxyDesignSchema = z.object({
   id: z.string(),
   /** Carta de Scryfall de la que salió, para poder volver a ella. */
   sourceCardId: z.string().optional(),
+  layout: z.enum(CARD_LAYOUTS).default('card'),
   frameSet: frameSetSchema.default('m15'),
   variant: cardVariantSchema.default('regular'),
   frameColor: frameColorSchema.default('colorless'),
@@ -127,6 +143,10 @@ export const proxyDesignSchema = z.object({
    * reglas, llevan este símbolo centrado en la caja de texto.
    */
   basicWatermark: z.enum(['w', 'u', 'b', 'r', 'g', 'c']).optional(),
+  /** Sólo si `layout` es `planeswalker`: lealtad inicial. */
+  loyalty: z.string().default(''),
+  /** Sólo si `layout` es `planeswalker`: sus habilidades, de arriba a abajo. */
+  abilities: z.array(planeswalkerAbilitySchema).default([]),
   /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.

@@ -30,6 +30,7 @@ export function Proxies() {
     const now = Date.now()
     const design: ProxyDesign = {
       id: newId(),
+      layout: 'card',
       frameSet: 'm15',
       variant: 'regular',
       edited: false,
@@ -47,6 +48,8 @@ export function Proxies() {
         artist: '',
         info: '',
       },
+      loyalty: '',
+      abilities: [],
       createdAt: now,
       updatedAt: now,
     }

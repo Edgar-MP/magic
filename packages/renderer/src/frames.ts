@@ -186,6 +186,72 @@ export const FRAME_ACCENT: Record<FrameColor, string> = {
   colorlessLand: '#8f96a3',
 }
 
+/**
+ * Geometría del marco de planeswalker: es una plantilla distinta de la normal
+ * (sin fuerza/resistencia, con una caja de habilidades de lealtad en vez de la
+ * de reglas), así que no encaja en `FrameSet`/`VariantSpec`. Coordenadas de
+ * `data/scripts/versions/m15Planeswalker/regular.js` de CardConjurer, pasadas
+ * de fracciones de 1500×2100 a fracciones de 0 a 1 (misma proporción).
+ */
+export const PLANESWALKER = {
+  aspect: 1500 / 2100,
+  art: { x: 105 / 1500, y: 212 / 2100, width: 1290 / 1500, height: 1709 / 2100 },
+  setSymbol: { x: 1383 / 1500, y: 1237 / 2100, width: 180 / 1500, height: 80 / 2100, align: 'right' as const },
+  // Los números de CardConjurer para el título y el tipo no encajaban con el
+  // PNG real de este marco (probado a ojo: el texto salía pegado al filo del
+  // arte, no dentro de la barra). Se recalcularon a mano mirando los píxeles
+  // del marco (dónde empieza y acaba de verdad la franja clara): el centro de
+  // cada franja es fiable, así que la caja se reconstruye alrededor de él con
+  // una altura holgada para centrar el texto.
+  title: {
+    x: 130 / 1500,
+    y: 130.5 / 2100 - 0.0543 / 2,
+    width: 1248 / 1500,
+    height: 0.0543,
+    size: 80 / 2100,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  mana: {
+    x: 130 / 1500,
+    // Centrado con la franja real del título (130.5/2100), no con el "94" de
+    // CardConjurer, que quedaba desalineado con el nombre.
+    y: 130.5 / 2100 - 35 / 2100,
+    width: 1248 / 1500,
+    height: 70 / 2100,
+    size: 70 / 2100,
+    font: 'title' as const,
+    align: 'right' as const,
+    oneLine: true,
+  },
+  type: {
+    x: 130 / 1500,
+    // Centro confirmado con el símbolo de expansión, que sí coincidía con el
+    // PNG (1237/2100).
+    y: 1237 / 2100 - 0.0543 / 2,
+    width: 1248 / 1500,
+    height: 0.0543,
+    size: 68 / 2100,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /** Caja completa de habilidades: se reparte en tantas filas como haga falta. */
+  abilities: { x: 179 / 1500, y: 1314 / 2100, width: 1205 / 1500, height: 607 / 2100 },
+  loyalty: {
+    x: 1209 / 1500,
+    y: 1954 / 2100,
+    width: 210 / 1500,
+    height: 78 / 2100,
+    size: 78 / 2100,
+    font: 'titleSmallCaps' as const,
+    align: 'center' as const,
+    oneLine: true,
+    middle: true,
+  },
+}
+
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */
 export const FONT_FAMILY: Record<FontRole, string> = {
   title: 'belerenb',
@@ -348,7 +414,7 @@ export function landSymbolPath(land: 'w' | 'u' | 'b' | 'r' | 'g' | 'c'): string 
  * Letra con la que se nombran los ficheros de cada color. `M` es multicolor
  * (oro), `A` artefacto, `L` tierra, `C` incoloro, `V` vehículo.
  */
-const LETTER: Record<FrameColor, string> = {
+export const LETTER: Record<FrameColor, string> = {
   white: 'W',
   blue: 'U',
   black: 'B',
@@ -423,6 +489,18 @@ export const paths = {
 
   basicWatermark(land: 'w' | 'u' | 'b' | 'r' | 'g' | 'c'): string {
     return `m15/basics/${land}.png`
+  },
+
+  /** El marco de planeswalker sólo existe en siete colores (sin tierras ni vehículo). */
+  planeswalkerFrame(color: FrameColor): string {
+    const base = isLandFrame(color) ? color.replace(/Land$/, '') : color
+    const actual = base === 'vehicle' || base === 'colorless' ? 'artifact' : base
+    return `planeswalker/planeswalkerFrame${LETTER[actual as FrameColor].toUpperCase()}.png`
+  },
+
+  planeswalkerPip(sign: 'plus' | 'minus' | 'neutral'): string {
+    const file = { plus: 'planeswalkerPlus', minus: 'planeswalkerMinus', neutral: 'planeswalkerNeutral' }
+    return `planeswalker/${file[sign]}.png`
   },
 
   /** Reverso clásico de Magic. */
