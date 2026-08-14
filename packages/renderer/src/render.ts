@@ -3,6 +3,7 @@ import type { RenderEnv, Surface } from './env.js'
 import type { Box, FrameSet, TextBox, VariantSpec } from './frames.js'
 import {
   FONT_FAMILY,
+  FRAME_ACCENT,
   FRAME_SETS,
   M15,
   VARIANTS,
@@ -443,7 +444,7 @@ async function drawText(
   const pt = box('pt')
   if (pt && design.flags.showPt) drawOneLine(ctx, design.text.pt, pt, scale, style('pt'))
 
-  drawNote(ctx, design.text.note, set.note, scale)
+  drawNote(ctx, design.text.note, set.note, scale, FRAME_ACCENT[design.frameColor])
 
   const info = box('info')
   if (info) drawInfoLine(ctx, design, info, scale)
@@ -599,6 +600,7 @@ function drawNote(
   text: string | undefined,
   box: TextBox,
   scale: Scale,
+  accent: string,
 ): void {
   // Un diseño guardado antes de que existiera este campo llega sin él: mejor no
   // pintar la etiqueta que reventar la carta entera.
@@ -619,10 +621,12 @@ function drawNote(
   if (size !== nominal) ctx.font = fontString(box, size, true)
 
   roundedRect(ctx, target.x, target.y, target.width, target.height, target.height * 0.3)
-  ctx.fillStyle = 'rgba(0,0,0,0.62)'
+  ctx.fillStyle = 'rgba(0,0,0,0.72)'
   ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'
-  ctx.lineWidth = Math.max(1, nominal * 0.045)
+  // El borde va del color del marco: es lo que hace que la cajita se lea como
+  // una continuación de la barra del nombre y no como un rótulo suelto.
+  ctx.strokeStyle = accent
+  ctx.lineWidth = Math.max(1, nominal * 0.09)
   ctx.stroke()
 
   ctx.fillStyle = '#ffffff'

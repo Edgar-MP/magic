@@ -163,6 +163,30 @@ export const M15: FrameSet = {
 
 export const FRAME_SETS: Record<string, FrameSet> = { m15: M15 }
 
+/**
+ * Color aproximado del borde de cada marco, para que la etiqueta bajo el
+ * nombre se pinte a juego (el borde de esa cajita no sale del PNG del marco:
+ * se dibuja aparte, así que hace falta saber qué color le toca).
+ */
+export const FRAME_ACCENT: Record<FrameColor, string> = {
+  white: '#c9b877',
+  blue: '#2f6db0',
+  black: '#4a4a4a',
+  red: '#b5432c',
+  green: '#3a7048',
+  gold: '#d4af37',
+  artifact: '#8f96a3',
+  colorless: '#8f96a3',
+  vehicle: '#6b4a2f',
+  whiteLand: '#c9b877',
+  blueLand: '#2f6db0',
+  blackLand: '#4a4a4a',
+  redLand: '#b5432c',
+  greenLand: '#3a7048',
+  goldLand: '#d4af37',
+  colorlessLand: '#8f96a3',
+}
+
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */
 export const FONT_FAMILY: Record<FontRole, string> = {
   title: 'belerenb',
