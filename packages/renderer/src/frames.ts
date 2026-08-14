@@ -272,12 +272,13 @@ export const PLANESWALKER = {
   /** Sello holográfico: misma fila que el escudo de lealtad, a su izquierda. */
   holoStamp: { x: 0.42, y: 1925 / 2100 - 0.023, width: 0.128, height: 0.046 },
   /** Artista e info: a la izquierda del escudo de lealtad, en la misma fila. */
+  // Calcado del marco normal (mismo x/y/tamaño): así se ve exactamente igual
+  // que en el resto de plantillas, no una versión aparte más pequeña o mal
+  // colocada.
   info: {
-    x: 130 / 1500,
-    y: 1925 / 2100 - 0.011,
-    width: 0.7,
-    // Mismo tamaño que en el marco normal: se veía enano comparado con las
-    // demás cartas.
+    x: 0.0854,
+    y: 0.9476,
+    width: 0.8292,
     height: 0.022,
     size: 0.0186,
     font: 'body' as const,

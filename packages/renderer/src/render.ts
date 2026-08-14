@@ -292,11 +292,24 @@ async function drawPlaneswalkerBadges(
     if (pip) ctx.drawImage(pip, badgeX, badgeY, badgeWidth, badgeHeight)
 
     ctx.save()
-    ctx.font = `${badgeHeight * 0.52}px "${FONT_FAMILY.titleSmallCaps}"`
+    const nominal = badgeHeight * 0.52
+    ctx.font = `${nominal}px "${FONT_FAMILY.titleSmallCaps}"`
+    // El coste puede tener más de un carácter (`+10`, `-13`, `X`…): si no
+    // cupiera en la insignia, se encoge en vez de salirse de ella.
+    const { scaleX, fontSize } = condenseToWidth(
+      ctx.measureText(ability.cost).width,
+      badgeWidth * 0.74,
+      nominal,
+    )
+    if (fontSize !== nominal) ctx.font = `${fontSize}px "${FONT_FAMILY.titleSmallCaps}"`
     ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'alphabetic'
-    ctx.fillText(ability.cost, badgeX + badgeWidth / 2, row.y + row.height / 2 + badgeHeight * 0.18)
+    const textX = badgeX + badgeWidth / 2
+    const textY = row.y + row.height / 2 + badgeHeight * 0.18
+    ctx.translate(textX, textY)
+    ctx.scale(scaleX, 1)
+    ctx.fillText(ability.cost, 0, 0)
     ctx.restore()
   }
 }
