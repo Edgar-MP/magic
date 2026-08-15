@@ -1,25 +1,24 @@
-# Plantillas de carta que faltan
+# Plantillas de carta
 
-Ya hechas: normal/tierra básica, **planeswalker** (marco, lealtad y
-habilidades), **saga** (marco, capítulos y numerales romanos) y **battle**
-(marco apaisado, texto de reglas normal y casillas de defensa — sólo la cara
-frontal; la trasera es una carta normal aparte y queda pendiente como parte
-de Transform/DFC más abajo).
+Hechas de punta a punta (render, import de Scryfall, tests): normal/tierra
+básica, **planeswalker**, **saga**, **battle** (solo cara frontal), **class**,
+**adventure**, doble cara/**transform** (`backFaceId`/`isBackFace`), **split**
+(`splitPartnerId`/`isSplitPartner`) y **flip** (`flipPartnerId`/`isFlipPartner`).
 
-Quedan estas plantillas propias (cada una es prácticamente un editor nuevo:
-sprites + estructura de datos + layout de render):
+**Solo Planeswalker está visible en el editor.** El resto está implementado
+pero oculto a propósito (`SHOW_HIDDEN_LAYOUTS = false` en
+`packages/web/src/routes/ProxyEditor.tsx`) — se van a ir activando uno a uno
+a mano. Para activar una:
+- Saga/Battle/Class: descomentar su `<Toggle>` en la sección "Marco".
+- Doble cara/Split/Flip/Adventure: poner `SHOW_HIDDEN_LAYOUTS = true` (activa
+  las cuatro secciones de golpe; si se quiere una a una, separar el flag).
 
-1. **Class** — niveles con coste de mejora, tipo escalera (como Saga pero vertical).
-2. **Adventure** — dos hechizos en una sola carta (mitad conjuro + mitad criatura).
-3. **Split card** — dos cartas completas lado a lado (fuse).
-4. **Flip card** (Kamigawa clásico) — la misma carta boca abajo es otra.
-5. **Transform / doble cara** (DFC) — frente normal, dorso distinto. Incluye la
-   cara trasera de Battle, que hoy no se cubre.
-6. **Meld** — dos cartas que se combinan en una tercera más grande.
-7. **Case** (Duskmourn) — como Saga pero con una "solución" en vez de capítulos.
-8. **Vanguard / Plane / Scheme / Contraption** — formatos especiales, de nicho.
+Quedan sin implementar (nicho, no urgen):
 
-De todas, la que más se juega es Transform/DFC; el resto es más de nicho.
+1. **Meld** — dos cartas que se combinan en una tercera más grande.
+2. **Case** (Duskmourn) — como Saga pero con una "solución" en vez de capítulos.
+3. **Vanguard / Plane / Scheme / Contraption** — formatos especiales, no se
+   juegan con mazos normales.
 
 Los sprites de todas salen de la misma fuente que ya se usa
 (`fiahdrgn473/CardConjurer`, vía `scripts/fetch-assets.ts`).
