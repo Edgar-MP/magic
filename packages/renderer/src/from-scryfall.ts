@@ -1,4 +1,4 @@
-import type { Card, Color, FrameColor, PlaneswalkerAbility, ProxyDesign, SagaChapter } from '@magic/shared'
+import type { Adventure, Card, Color, FrameColor, PlaneswalkerAbility, ProxyDesign, SagaChapter } from '@magic/shared'
 import { hasType, isBasicLand, isLegendary } from '@magic/shared'
 
 /**
@@ -129,6 +129,24 @@ function sagaChaptersOf(card: Card): SagaChapter[] {
   return chapters
 }
 
+/**
+ * Hechizo de aventura (`layout: 'adventure'`, como Bonecrusher Giant //
+ * Stomp): `card_faces[0]` es la criatura principal, `card_faces[1]` el
+ * hechizo pequeño. Se rellena aparte del resto del diseño, que ya usa
+ * `card_faces[0]` para todo lo demás.
+ */
+function adventureOf(card: Card): Adventure | null {
+  if (card.layout !== 'adventure') return null
+  const spell = card.card_faces?.[1]
+  if (!spell) return null
+  return {
+    name: spell.name,
+    mana: spell.mana_cost ?? '',
+    type: spell.type_line ?? '',
+    oracle: spell.oracle_text ?? '',
+  }
+}
+
 /** Línea inferior: `M10 · 146 · ES`, como la de las cartas reales. */
 function infoLine(card: Card): string {
   return [card.set.toUpperCase(), card.collector_number, card.rarity?.[0]?.toUpperCase()]
@@ -161,6 +179,7 @@ export function cardToDesign(
   // `card_faces[0]`, no en la raíz.
   const battle = card.layout === 'battle' || hasType(card, 'Battle')
   const defense = battle ? (card.defense ?? face?.defense ?? '') : ''
+  const adventure = adventureOf(card)
 
   const artUrl = useOfficialArt
     ? (card.image_uris?.art_crop ?? face?.image_uris?.art_crop)
@@ -192,14 +211,24 @@ export function cardToDesign(
     ...(watermark ? { basicWatermark: watermark } : {}),
     text: {
       name: card.name.split(' // ')[0] ?? card.name,
-      mana: card.mana_cost ?? face?.mana_cost ?? '',
+      // Una Adventure real es de doble cara (`adventure`): igual que Battle,
+      // el `mana_cost`/`type_line`/`oracle_text` de la raíz junta los de las
+      // dos caras («{2}{R} // {1}{R}»), así que hay que quedarse con el de la
+      // cara principal (la criatura), no con el combinado.
+      mana: (adventure ? face?.mana_cost : undefined) ?? card.mana_cost ?? face?.mana_cost ?? '',
       // Una Battle real es de doble cara (`transform`): el `type_line` de la
       // raíz junta las dos («Battle — Siege // Creature — …»), así que aquí
       // hay que quedarse con el de la cara frontal, no con el combinado.
-      type: (battle ? face?.type_line : undefined) ?? card.type_line ?? face?.type_line ?? '',
+      type:
+        (battle || adventure ? face?.type_line : undefined) ??
+        card.type_line ??
+        face?.type_line ??
+        '',
       // Las básicas llevan el símbolo grande en vez del `({T}: Add {U}.)` que
       // Scryfall pone como texto de reglas.
-      oracle: watermark ? '' : (card.oracle_text ?? face?.oracle_text ?? ''),
+      oracle: watermark
+        ? ''
+        : ((adventure ? face?.oracle_text : undefined) ?? card.oracle_text ?? face?.oracle_text ?? ''),
       flavor: card.flavor_text ?? face?.flavor_text ?? '',
       // La etiqueta la escribe quien haga el proxy: en blanco por defecto.
       note: '',
@@ -213,6 +242,7 @@ export function cardToDesign(
     defense,
     backFaceId: null,
     isBackFace: false,
+    adventure,
     createdAt: now,
     updatedAt: now,
   }

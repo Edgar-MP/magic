@@ -68,6 +68,41 @@ const invasionOfGobakhan = cardSchema.parse({
   ],
 })
 
+/**
+ * Adventure real (Scryfall): `layout: 'adventure'`, con `card_faces[0]` la
+ * criatura principal y `card_faces[1]` el hechizo pequeño. El `mana_cost`,
+ * `type_line` y `oracle_text` de la raíz juntan los de las dos caras (o van a
+ * `null`, como el `oracle_text` de la raíz), igual que en Battle.
+ */
+const bonecrusherGiant = cardSchema.parse({
+  id: 'bonecrusher-giant',
+  name: 'Bonecrusher Giant',
+  layout: 'adventure',
+  mana_cost: '{2}{R} // {1}{R}',
+  type_line: 'Creature — Giant // Instant — Adventure',
+  colors: ['R'],
+  color_identity: ['R'],
+  legalities: {},
+  set: 'eld',
+  card_faces: [
+    {
+      name: 'Bonecrusher Giant',
+      mana_cost: '{2}{R}',
+      type_line: 'Creature — Giant',
+      power: '4',
+      toughness: '3',
+      oracle_text:
+        "Whenever this creature becomes the target of a spell, this creature deals 2 damage to that spell's controller.",
+    },
+    {
+      name: 'Stomp',
+      mana_cost: '{1}{R}',
+      type_line: 'Instant — Adventure',
+      oracle_text: "Damage can't be prevented this turn. Stomp deals 2 damage to any target.",
+    },
+  ],
+})
+
 describe('cardToDesign', () => {
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
@@ -108,6 +143,23 @@ describe('cardToDesign', () => {
     expect(design.text.name).toBe('Invasion of Gobakhan')
     expect(design.text.type).toBe('Battle — Siege')
     expect(design.text.mana).toBe('{2}{W}')
+  })
+
+  it('detecta un hechizo de aventura y lo separa de la criatura principal', () => {
+    const design = cardToDesign(bonecrusherGiant, { id: 'x', now: 0 })
+    expect(design.layout).toBe('card')
+    expect(design.text.name).toBe('Bonecrusher Giant')
+    expect(design.text.mana).toBe('{2}{R}')
+    expect(design.text.type).toBe('Creature — Giant')
+    expect(design.text.oracle).toBe(
+      "Whenever this creature becomes the target of a spell, this creature deals 2 damage to that spell's controller.",
+    )
+    expect(design.adventure).toEqual({
+      name: 'Stomp',
+      mana: '{1}{R}',
+      type: 'Instant — Adventure',
+      oracle: "Damage can't be prevented this turn. Stomp deals 2 damage to any target.",
+    })
   })
 
   it('una carta normal no lleva capa de planeswalker', () => {

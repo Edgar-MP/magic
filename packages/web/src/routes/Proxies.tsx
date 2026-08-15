@@ -54,6 +54,7 @@ export function Proxies() {
       defense: '',
       backFaceId: null,
       isBackFace: false,
+      adventure: null,
       createdAt: now,
       updatedAt: now,
     }

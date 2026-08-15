@@ -491,6 +491,56 @@ export const BATTLE = {
   },
 }
 
+/**
+ * Geometría del recuadro de hechizo de aventura: se superpone al marco normal
+ * (`card`, o cualquier otro layout base), dentro de la ventana de arte, sin
+ * marco propio de CardConjurer/CardConjurer-fork (no hay ninguno en
+ * `fiahdrgn473/CardConjurer`: ni `img/frames/m15/adventure` ni nada
+ * equivalente en `data/images/cardImages`). Se dibuja como un rectángulo
+ * semitransparente con el color de maná del hechizo de aventura, no una
+ * imagen.
+ *
+ * Encaja en la mitad inferior-izquierda de la ventana de arte del marco `card`
+ * normal (`M15.art`: x 0.0767–0.9243, y 0.1129–0.5558), dejando margen por
+ * arriba (para no tapar la etiqueta bajo el nombre, `M15.note`, que acaba en
+ * y=0.1511) y por abajo (el arte acaba en 0.5558, el tipo del hechizo
+ * principal no empieza hasta 0.5664). Verificado por muestreo de píxeles con
+ * un render real (`scripts/.tmp-geometry-check.ts`, borrado tras comprobar).
+ */
+export const ADVENTURE = {
+  box: { x: 0.095, y: 0.175, width: 0.4, height: 0.33 },
+  // Nombre y maná comparten fila, igual que en el marco normal.
+  nameMana: {
+    x: 0.095 + 0.018,
+    y: 0.175 + 0.016,
+    width: 0.4 - 0.036,
+    height: 0.052,
+    size: 0.026,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  type: {
+    x: 0.095 + 0.018,
+    y: 0.175 + 0.016 + 0.052 + 0.008,
+    width: 0.4 - 0.036,
+    height: 0.042,
+    size: 0.022,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  oracle: {
+    x: 0.095 + 0.018,
+    y: 0.175 + 0.016 + 0.052 + 0.008 + 0.042 + 0.01,
+    width: 0.4 - 0.036,
+    // Hasta el filo inferior de `box`, con un pelín de margen.
+    height: 0.175 + 0.33 - (0.175 + 0.016 + 0.052 + 0.008 + 0.042 + 0.01) - 0.014,
+    size: 0.021,
+    font: 'body' as const,
+  },
+}
+
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */
 export const FONT_FAMILY: Record<FontRole, string> = {
   title: 'belerenb',

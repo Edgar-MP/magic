@@ -2,6 +2,7 @@ import type { ArtPlacement, ProxyDesign } from '@magic/shared'
 import type { RenderEnv, Surface } from './env.js'
 import type { Box, FrameSet, TextBox, VariantSpec } from './frames.js'
 import {
+  ADVENTURE,
   BATTLE,
   FONT_FAMILY,
   FRAME_ACCENT,
@@ -92,8 +93,109 @@ export async function renderCardLayers(
   // le queda a la línea de tipo.
   const symbolWidthPx = await drawSetSymbol(ctx, env, design, set, variant, scale)
   await drawText(ctx, env, design, set, variant, scale, symbolWidthPx)
+  if (design.adventure) await drawAdventureBox(ctx, env, design, design.adventure, scale)
 
   return { overlay, artBox: artBoxOf(set, variant.id), width, height }
+}
+
+/**
+ * Recuadro de hechizo de aventura: se superpone al arte del marco normal con
+ * un segundo hechizo más pequeño (nombre, maná, tipo y reglas), como en las
+ * cartas de Throne of Eldraine. No hay marco propio en el juego de assets
+ * (ni en CardConjurer, ver `frames.ts`), así que el fondo es un rectángulo
+ * semitransparente con el color de maná del hechizo, reutilizando
+ * `FRAME_ACCENT` (la misma paleta que ya usa el resto del renderizador para
+ * acentos de color) y el mismo degradado de dos colores que `drawFrame` usa
+ * para las cartas híbridas.
+ */
+async function drawAdventureBox(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  adventure: NonNullable<ProxyDesign['adventure']>,
+  scale: Scale,
+): Promise<void> {
+  const box = px(ADVENTURE.box, scale)
+  const accent = FRAME_ACCENT[design.frameColor]
+  const accent2 =
+    design.secondColor && design.secondColor !== design.frameColor
+      ? FRAME_ACCENT[design.secondColor]
+      : undefined
+
+  ctx.save()
+  roundedRect(ctx, box.x, box.y, box.width, box.height, box.height * 0.03)
+  ctx.clip()
+
+  // Fondo con el color de acento, a la misma opacidad que las bandas de
+  // habilidad de planeswalker (0.5, ver `drawPlaneswalkerAbilities`), más una
+  // capa oscura debajo del texto para que se lea igual de bien con cualquier
+  // color de acento (algunos, como el blanco, son demasiado claros).
+  if (accent2) {
+    const gradient = ctx.createLinearGradient(box.x, box.y, box.x + box.width, box.y)
+    gradient.addColorStop(0, accent)
+    gradient.addColorStop(1, accent2)
+    ctx.fillStyle = gradient
+  } else {
+    ctx.fillStyle = accent
+  }
+  ctx.globalAlpha = 0.55
+  ctx.fillRect(box.x, box.y, box.width, box.height)
+  ctx.globalAlpha = 0.35
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(box.x, box.y, box.width, box.height)
+  ctx.globalAlpha = 1
+  ctx.restore()
+
+  ctx.save()
+  roundedRect(ctx, box.x, box.y, box.width, box.height, box.height * 0.03)
+  ctx.strokeStyle = accent
+  ctx.lineWidth = Math.max(1, scale.height * 0.003)
+  ctx.stroke()
+  ctx.restore()
+
+  drawOneLine(ctx, adventure.name, ADVENTURE.nameMana, scale, {
+    color: '#ffffff',
+    shadow: true,
+    maxWidth: reservedTitleWidth(adventure.mana, ADVENTURE.nameMana, ADVENTURE.nameMana, scale),
+  })
+  await drawManaCost(ctx, env, { ...design, text: { ...design.text, mana: adventure.mana } }, ADVENTURE.nameMana, scale)
+  drawOneLine(ctx, adventure.type, ADVENTURE.type, scale, { color: '#ffffff', shadow: true })
+
+  const tokens = tokenize(adventure.oracle)
+  if (tokens.length === 0) return
+
+  const rulesPx = px(ADVENTURE.oracle, scale)
+  const nominal = ADVENTURE.oracle.size * scale.height
+
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(rulesPx.x, rulesPx.y, rulesPx.width, rulesPx.height)
+  ctx.clip()
+
+  const measureText = (text: string, fontSize: number, italic: boolean) => {
+    ctx.font = fontString(ADVENTURE.oracle, fontSize, italic)
+    return ctx.measureText(text).width
+  }
+  const layout = layoutAutofit(tokens, {
+    width: rulesPx.width,
+    height: rulesPx.height,
+    fontSize: nominal,
+    minFontSize: nominal * 0.4,
+    measureText,
+  })
+
+  let y = rulesPx.y + Math.max(0, (rulesPx.height - layout.height) / 2)
+  const style: DrawStyle = { color: '#ffffff', shadow: true }
+  for (const line of layout.lines) {
+    y += line.spaceBefore
+    if (line.divider) {
+      y += layout.lineHeight
+      continue
+    }
+    await drawLine(ctx, env, line, ADVENTURE.oracle, layout.fontSize, rulesPx.x, y, style)
+    y += layout.lineHeight
+  }
+  ctx.restore()
 }
 
 /**
@@ -122,7 +224,7 @@ async function renderPlaneswalkerLayers(
 
   const symbolWidthPx = await drawPlaneswalkerSetSymbol(ctx, env, design, scale)
   drawOneLine(ctx, design.text.name, PLANESWALKER.title, scale, {
-    maxWidth: reservedTitleWidth(design, PLANESWALKER.title, PLANESWALKER.mana, scale),
+    maxWidth: reservedTitleWidth(design.text.mana, PLANESWALKER.title, PLANESWALKER.mana, scale),
   })
   await drawManaCost(ctx, env, design, PLANESWALKER.mana, scale)
   drawOneLine(ctx, design.text.type, PLANESWALKER.type, scale, {
@@ -362,7 +464,7 @@ async function renderSagaLayers(
 
   const symbolWidthPx = await drawSagaSetSymbol(ctx, env, design, scale)
   drawOneLine(ctx, design.text.name, SAGA.title, scale, {
-    maxWidth: reservedTitleWidth(design, SAGA.title, SAGA.mana, scale),
+    maxWidth: reservedTitleWidth(design.text.mana, SAGA.title, SAGA.mana, scale),
   })
   await drawManaCost(ctx, env, design, SAGA.mana, scale)
   drawOneLine(ctx, design.text.type, SAGA.type, scale, {
@@ -532,7 +634,7 @@ async function renderBattleLayers(
 
   const symbolWidthPx = await drawBattleSetSymbol(ctx, env, design, scale)
   drawOneLine(ctx, design.text.name, BATTLE.title, scale, {
-    maxWidth: reservedTitleWidth(design, BATTLE.title, BATTLE.mana, scale),
+    maxWidth: reservedTitleWidth(design.text.mana, BATTLE.title, BATTLE.mana, scale),
   })
   await drawManaCost(ctx, env, design, BATTLE.mana, scale)
   drawOneLine(ctx, design.text.type, BATTLE.type, scale, {
@@ -973,7 +1075,7 @@ async function drawText(
   if (title) {
     drawOneLine(ctx, design.text.name, title, scale, {
       // El nombre se comprime para no chocar con el coste de maná.
-      maxWidth: reservedTitleWidth(design, title, mana, scale),
+      maxWidth: reservedTitleWidth(design.text.mana, title, mana, scale),
       ...style('title'),
     })
   }
@@ -1007,13 +1109,13 @@ async function drawText(
 
 /** El ancho que le queda al título después del coste de maná. */
 function reservedTitleWidth(
-  design: ProxyDesign,
+  manaCost: string,
   title: TextBox,
   mana: TextBox | undefined,
   scale: Scale,
 ): number {
   const width = title.width * scale.width
-  const symbols = tokenizeManaCost(design.text.mana).length
+  const symbols = tokenizeManaCost(manaCost).length
   if (symbols === 0 || !mana) return width
 
   const size = mana.size * scale.height

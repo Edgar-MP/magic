@@ -112,6 +112,22 @@ export const sagaChapterSchema = z.object({
 export type SagaChapter = z.infer<typeof sagaChapterSchema>
 
 /**
+ * Hechizo de aventura: el recuadro superpuesto sobre el marco normal de una
+ * criatura (o cualquier otro layout base) con un segundo hechizo más pequeño,
+ * como las de Throne of Eldraine. No es un `layout` aparte — convive con
+ * `card` (o el que toque) mediante este campo opcional. Mismos nombres de
+ * campo que `proxyTextSchema` para el hechizo principal.
+ */
+export const adventureSchema = z.object({
+  name: z.string().default(''),
+  /** Coste de maná en notación de Scryfall: `{1}{R}`. */
+  mana: z.string().default(''),
+  type: z.string().default(''),
+  oracle: z.string().default(''),
+})
+export type Adventure = z.infer<typeof adventureSchema>
+
+/**
  * `card` es la plantilla normal (criatura/hechizo/tierra…); `planeswalker`
  * cambia a la caja de habilidades con coste de lealtad; `saga` cambia a la
  * franja lateral con capítulos numerados; `battle` es la plantilla apaisada
@@ -179,6 +195,11 @@ export const proxyDesignSchema = z.object({
    * fuera una carta independiente y suelta.
    */
   isBackFace: z.boolean().default(false),
+  /**
+   * Hechizo de aventura, si esta carta tiene uno (una criatura con un hechizo
+   * más pequeño superpuesto, tipo Throne of Eldraine). `null` si no tiene.
+   */
+  adventure: adventureSchema.nullable().default(null),
   /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.

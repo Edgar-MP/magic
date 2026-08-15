@@ -5,6 +5,7 @@ import {
   CARD_VARIANTS,
   CARD_VARIANT_LABELS,
   FRAME_COLORS,
+  type Adventure,
   type CardVariant,
   type FrameColor,
   type PlaneswalkerAbility,
@@ -98,6 +99,9 @@ export function ProxyEditor() {
 
   const removeAbility = (index: number) =>
     update({ abilities: draft.abilities.filter((_, i) => i !== index) })
+
+  const setAdventure = (changes: Partial<Adventure>) =>
+    update({ adventure: draft.adventure ? { ...draft.adventure, ...changes } : draft.adventure })
 
   const setChapter = (index: number, changes: Partial<SagaChapter>) =>
     update({
@@ -582,6 +586,44 @@ export function ProxyEditor() {
               />
             </Section>
           )}
+
+          <Section title="Aventura">
+            <Toggle
+              label="Esta carta tiene un hechizo de aventura"
+              checked={draft.adventure !== null}
+              onChange={(v) =>
+                update({
+                  adventure: v ? { name: '', mana: '', type: '', oracle: '' } : null,
+                })
+              }
+            />
+            {draft.adventure && (
+              <>
+                <Field
+                  label="Nombre"
+                  value={draft.adventure.name}
+                  onChange={(v) => setAdventure({ name: v })}
+                />
+                <Field
+                  label="Maná"
+                  value={draft.adventure.mana}
+                  onChange={(v) => setAdventure({ mana: v })}
+                  hint="Notación de Scryfall: {1}{R}"
+                />
+                <Field
+                  label="Tipo"
+                  value={draft.adventure.type}
+                  onChange={(v) => setAdventure({ type: v })}
+                />
+                <RichTextField
+                  label="Texto de reglas"
+                  value={draft.adventure.oracle}
+                  onChange={(v) => setAdventure({ oracle: v })}
+                  compact
+                />
+              </>
+            )}
+          </Section>
         </div>
       </div>
 
