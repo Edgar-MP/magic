@@ -35,6 +35,39 @@ const songOfFreyalise = cardSchema.parse({
     'III — Put a +1/+1 counter on each creature you control. Those creatures gain vigilance, trample, and indestructible until end of turn.',
 })
 
+/**
+ * Battle real (Scryfall): son de doble cara (`layout: 'transform'`, nunca
+ * `'battle'`), con la cara frontal de casillas y `defense` sólo en esa cara,
+ * no en la raíz de la carta.
+ */
+const invasionOfGobakhan = cardSchema.parse({
+  id: 'invasion-of-gobakhan',
+  name: 'Invasion of Gobakhan // Prava, Warrior Empress',
+  layout: 'transform',
+  type_line: 'Battle — Siege // Legendary Creature — Human Soldier',
+  colors: ['W'],
+  color_identity: ['W'],
+  legalities: {},
+  set: 'mom',
+  card_faces: [
+    {
+      name: 'Invasion of Gobakhan',
+      mana_cost: '{2}{W}',
+      type_line: 'Battle — Siege',
+      defense: '3',
+      oracle_text:
+        "When this Siege enters, look at target opponent's hand. You may exile a nonland card from it. " +
+        'For as long as that card remains exiled, its owner may play it. A spell cast this way costs {2} more to cast.',
+    },
+    {
+      name: 'Prava, Warrior Empress',
+      type_line: 'Legendary Creature — Human Soldier',
+      power: '4',
+      toughness: '4',
+    },
+  ],
+})
+
 describe('cardToDesign', () => {
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
@@ -66,6 +99,15 @@ describe('cardToDesign', () => {
         text: 'Put a +1/+1 counter on each creature you control. Those creatures gain vigilance, trample, and indestructible until end of turn.',
       },
     ])
+  })
+
+  it('detecta una battle y saca la defensa de la cara frontal', () => {
+    const design = cardToDesign(invasionOfGobakhan, { id: 'x', now: 0 })
+    expect(design.layout).toBe('battle')
+    expect(design.defense).toBe('3')
+    expect(design.text.name).toBe('Invasion of Gobakhan')
+    expect(design.text.type).toBe('Battle — Siege')
+    expect(design.text.mana).toBe('{2}{W}')
   })
 
   it('una carta normal no lleva capa de planeswalker', () => {

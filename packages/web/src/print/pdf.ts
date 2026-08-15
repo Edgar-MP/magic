@@ -1,4 +1,5 @@
 import type { PDFImage, PDFPage, RGB } from 'pdf-lib'
+import { degrees } from 'pdf-lib'
 
 /**
  * Monta un PDF A4 con las cartas a tamaño real para imprimir y recortar.
@@ -142,11 +143,26 @@ export async function buildPdf(
 
   const place = (sheet: PDFPage, image: PDFImage, index: number, mirrored = false) => {
     const { x, y } = slotAt(index, mirrored)
+
+    // Una Battle se renderiza apaisada (más ancha que alta): la carta física
+    // sigue midiendo 63×88 mm igual que cualquier otra, pero la ilustración
+    // hay que rotarla 90° para que ocupe ese mismo hueco en vez de salir
+    // encogida (o estirada) dentro de una caja pensada para una vertical.
+    //
+    // `drawImage` rota alrededor de `(x, y)` (la esquina que tendría la
+    // imagen sin rotar), así que para que el resultado ya rotado caiga
+    // exactamente en el hueco `[x, x+63] × [y, y+88]` hay que dibujarla sin
+    // rotar en `(x + 63mm, y)` con el ancho y el alto intercambiados.
+    const landscape = image.width > image.height
+    const widthPt = (landscape ? CARD_HEIGHT_MM : CARD_WIDTH_MM) * MM_TO_PT
+    const heightPt = (landscape ? CARD_WIDTH_MM : CARD_HEIGHT_MM) * MM_TO_PT
+
     sheet.drawImage(image, {
-      x: x * MM_TO_PT,
+      x: (landscape ? x + CARD_WIDTH_MM : x) * MM_TO_PT,
       y: y * MM_TO_PT,
-      width: CARD_WIDTH_MM * MM_TO_PT,
-      height: CARD_HEIGHT_MM * MM_TO_PT,
+      width: widthPt,
+      height: heightPt,
+      ...(landscape ? { rotate: degrees(90) } : {}),
     })
   }
 

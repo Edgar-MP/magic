@@ -240,7 +240,7 @@ export function ProxyEditor() {
               hint="Sale en una cajita sobre la ilustración. Por ejemplo la carta original, o «PROXY». Vacía no se dibuja."
             />
             <Field label="Tipo" value={draft.text.type} onChange={(v) => setText('type', v)} />
-            {draft.layout === 'card' && (
+            {(draft.layout === 'card' || draft.layout === 'battle') && (
               <RichTextField
                 label="Texto de reglas"
                 value={draft.text.oracle}
@@ -248,7 +248,7 @@ export function ProxyEditor() {
                 hint="Un salto de línea por habilidad. Los paréntesis salen en cursiva."
               />
             )}
-            {draft.layout === 'card' && (
+            {(draft.layout === 'card' || draft.layout === 'battle') && (
               <Field
                 label="Ambientación"
                 value={draft.text.flavor}
@@ -280,6 +280,11 @@ export function ProxyEditor() {
               label="Saga (capítulos numerados)"
               checked={draft.layout === 'saga'}
               onChange={(v) => update({ layout: v ? 'saga' : 'card' })}
+            />
+            <Toggle
+              label="Battle (casillas de defensa)"
+              checked={draft.layout === 'battle'}
+              onChange={(v) => update({ layout: v ? 'battle' : 'card' })}
             />
 
             {draft.layout === 'card' && (
@@ -496,6 +501,16 @@ export function ProxyEditor() {
               >
                 Añadir capítulo
               </button>
+            </Section>
+          )}
+
+          {draft.layout === 'battle' && (
+            <Section title="Defensa">
+              <Field
+                label="Casillas de defensa iniciales"
+                value={draft.defense}
+                onChange={(v) => update({ defense: v })}
+              />
             </Section>
           )}
         </div>

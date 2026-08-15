@@ -136,6 +136,21 @@ function manifest(): [string, string][] {
   }
   files.push(['data/images/cardImages/saga/sagaChapter.png', 'saga/sagaChapter.png'])
 
+  // Battle: marco apaisado por color, una letra minúscula por archivo
+  // (a=artefacto, b=negro, c=incoloro, g=verde, l=tierra, m=multicolor,
+  // r=rojo, u=azul, w=blanco) más el sello holográfico propio.
+  for (const c of ['a', 'b', 'c', 'g', 'l', 'm', 'r', 'u', 'w']) {
+    files.push([`img/frames/m15/battle/${c}.png`, `battle/${c}.png`])
+  }
+  files.push(['img/frames/m15/battle/holostamp.png', 'battle/holostamp.png'])
+  // Máscara de la insignia de defensa: el marco deja un hueco con esa forma
+  // (una estrella de ocho puntas) y hay que rellenarlo a mano con un color,
+  // igual que `fillMasked` hace con el borde o la corona de legendaria.
+  files.push(['img/frames/m15/battle/maskDefense.png', 'battle/maskDefense.png'])
+  for (const mask of ['Title', 'Type', 'Rules', 'Pinline', 'Border']) {
+    files.push([`img/frames/m15/battle/mask${mask}.png`, `battle/mask${mask}.png`])
+  }
+
   // Tipografías: Beleren para títulos y tipos, MPlantin para el texto de reglas.
   for (const font of [
     'beleren-b.ttf',

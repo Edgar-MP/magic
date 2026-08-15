@@ -51,6 +51,7 @@ export function Proxies() {
       loyalty: '',
       abilities: [],
       chapters: [],
+      defense: '',
       createdAt: now,
       updatedAt: now,
     }

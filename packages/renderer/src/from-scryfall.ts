@@ -156,6 +156,11 @@ export function cardToDesign(
   const loyalty = card.loyalty ?? face?.loyalty ?? ''
   const saga = card.layout === 'saga' || hasType(card, 'Saga')
   const chapters = saga ? sagaChaptersOf(card) : []
+  // Las Battle reales son de doble cara (`layout: 'transform'`): la cara
+  // frontal (de casillas) es la única que cubrimos, y su `defense` viene en
+  // `card_faces[0]`, no en la raíz.
+  const battle = card.layout === 'battle' || hasType(card, 'Battle')
+  const defense = battle ? (card.defense ?? face?.defense ?? '') : ''
 
   const artUrl = useOfficialArt
     ? (card.image_uris?.art_crop ?? face?.image_uris?.art_crop)
@@ -164,7 +169,7 @@ export function cardToDesign(
   return {
     id,
     sourceCardId: card.id,
-    layout: planeswalker ? 'planeswalker' : saga ? 'saga' : 'card',
+    layout: planeswalker ? 'planeswalker' : saga ? 'saga' : battle ? 'battle' : 'card',
     frameSet: 'm15',
     variant: 'regular',
     edited: false,
@@ -188,7 +193,10 @@ export function cardToDesign(
     text: {
       name: card.name.split(' // ')[0] ?? card.name,
       mana: card.mana_cost ?? face?.mana_cost ?? '',
-      type: card.type_line ?? face?.type_line ?? '',
+      // Una Battle real es de doble cara (`transform`): el `type_line` de la
+      // raíz junta las dos («Battle — Siege // Creature — …»), así que aquí
+      // hay que quedarse con el de la cara frontal, no con el combinado.
+      type: (battle ? face?.type_line : undefined) ?? card.type_line ?? face?.type_line ?? '',
       // Las básicas llevan el símbolo grande en vez del `({T}: Add {U}.)` que
       // Scryfall pone como texto de reglas.
       oracle: watermark ? '' : (card.oracle_text ?? face?.oracle_text ?? ''),
@@ -202,6 +210,7 @@ export function cardToDesign(
     loyalty,
     abilities,
     chapters,
+    defense,
     createdAt: now,
     updatedAt: now,
   }

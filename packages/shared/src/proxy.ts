@@ -114,10 +114,12 @@ export type SagaChapter = z.infer<typeof sagaChapterSchema>
 /**
  * `card` es la plantilla normal (criatura/hechizo/tierra…); `planeswalker`
  * cambia a la caja de habilidades con coste de lealtad; `saga` cambia a la
- * franja lateral con capítulos numerados. No hay más plantillas especiales
- * todavía (class, battle…), pero el campo ya deja sitio.
+ * franja lateral con capítulos numerados; `battle` es la plantilla apaisada
+ * de casillas de defensa (sólo la cara frontal: la trasera es una carta
+ * normal aparte y se deja para una tarea futura de doble cara). No hay más
+ * plantillas especiales todavía (class…), pero el campo ya deja sitio.
  */
-export const CARD_LAYOUTS = ['card', 'planeswalker', 'saga'] as const
+export const CARD_LAYOUTS = ['card', 'planeswalker', 'saga', 'battle'] as const
 export type CardLayout = (typeof CARD_LAYOUTS)[number]
 
 export const proxyDesignSchema = z.object({
@@ -161,6 +163,8 @@ export const proxyDesignSchema = z.object({
   abilities: z.array(planeswalkerAbilitySchema).default([]),
   /** Sólo si `layout` es `saga`: sus capítulos, de arriba a abajo. */
   chapters: z.array(sagaChapterSchema).default([]),
+  /** Sólo si `layout` es `battle`: sus casillas de defensa iniciales. */
+  defense: z.string().default(''),
   /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.

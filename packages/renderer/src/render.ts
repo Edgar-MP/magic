@@ -2,6 +2,7 @@ import type { ArtPlacement, ProxyDesign } from '@magic/shared'
 import type { RenderEnv, Surface } from './env.js'
 import type { Box, FrameSet, TextBox, VariantSpec } from './frames.js'
 import {
+  BATTLE,
   FONT_FAMILY,
   FRAME_ACCENT,
   FRAME_SETS,
@@ -66,6 +67,7 @@ export async function renderCardLayers(
 ): Promise<CardLayers> {
   if (design.layout === 'planeswalker') return renderPlaneswalkerLayers(design, env, { width })
   if (design.layout === 'saga') return renderSagaLayers(design, env, { width })
+  if (design.layout === 'battle') return renderBattleLayers(design, env, { width })
 
   const set = FRAME_SETS[design.frameSet] ?? M15
   const variant = VARIANTS[design.variant] ?? VARIANTS.regular
@@ -502,6 +504,135 @@ async function drawSagaChapters(
     ctx.fillText(chapter.chapter, 0, 0)
     ctx.restore()
   }
+}
+
+/**
+ * Plantilla de Battle: apaisada, con el arte arriba, la franja de tipo y un
+ * panel de reglas opaco abajo, y la insignia de defensa (una estrella de
+ * ocho puntas ya recortada en el marco) en la esquina inferior derecha.
+ */
+async function renderBattleLayers(
+  design: ProxyDesign,
+  env: RenderEnv,
+  { width = PREVIEW_WIDTH }: { width?: number } = {},
+): Promise<CardLayers> {
+  const height = Math.round(width / BATTLE.aspect)
+
+  await env.ensureFonts(['title', 'titleSmallCaps', 'body', 'bodyItalic'])
+
+  const overlay = env.createSurface(width, height)
+  const { ctx } = overlay
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  const scale = { width, height }
+
+  const frame = await env.loadAsset(paths.battleFrame(design.frameColor)).catch(() => undefined)
+  if (frame) ctx.drawImage(frame, 0, 0, scale.width, scale.height)
+
+  const symbolWidthPx = await drawBattleSetSymbol(ctx, env, design, scale)
+  drawOneLine(ctx, design.text.name, BATTLE.title, scale, {
+    maxWidth: reservedTitleWidth(design, BATTLE.title, BATTLE.mana, scale),
+  })
+  await drawManaCost(ctx, env, design, BATTLE.mana, scale)
+  drawOneLine(ctx, design.text.type, BATTLE.type, scale, {
+    maxWidth: BATTLE.type.width * scale.width - symbolWidthPx,
+  })
+  drawNote(ctx, design.text.note, BATTLE.note, scale, FRAME_ACCENT[design.frameColor])
+  await drawBattleStamp(ctx, env, design, scale)
+  await drawBattleRules(ctx, env, design, scale)
+  await drawBattleDefense(ctx, env, design, scale)
+  drawInfoLine(ctx, design, BATTLE.info, scale)
+
+  return { overlay, artBox: BATTLE.art, width, height }
+}
+
+async function drawBattleSetSymbol(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<number> {
+  if (!design.setSymbol) return 0
+  const symbol = await env.loadImage(design.setSymbol).catch(() => undefined)
+  if (!symbol) return 0
+
+  const box = px(BATTLE.setSymbol, scale)
+  const height = box.height
+  const width = height * (symbol.width / symbol.height)
+  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
+  return Math.max(0, BATTLE.type.width * scale.width - (box.x - width - BATTLE.type.x * scale.width))
+}
+
+async function drawBattleStamp(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  if (!design.flags.stamp) return
+  const stamp = await env.loadAsset('battle/holostamp.png').catch(() => undefined)
+  if (!stamp) return
+  const target = px(BATTLE.holoStamp, scale)
+  ctx.drawImage(stamp, target.x, target.y, target.width, target.height)
+}
+
+/** Texto de reglas normal (sin capítulos ni habilidades), en el panel inferior. */
+async function drawBattleRules(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  const tokens = tokenize(design.text.oracle, { flavor: design.text.flavor })
+  if (tokens.length === 0) return
+
+  const box = px(BATTLE.rules, scale)
+  const nominal = BATTLE.rules.size * scale.height
+
+  const measureText = (text: string, fontSize: number, italic: boolean) => {
+    ctx.font = fontString(BATTLE.rules, fontSize, italic)
+    return ctx.measureText(text).width
+  }
+
+  const layout = layoutAutofit(tokens, {
+    width: box.width,
+    height: box.height,
+    fontSize: nominal,
+    measureText,
+  })
+
+  let y = box.y + Math.max(0, (box.height - layout.height) / 2)
+  for (const line of layout.lines) {
+    y += line.spaceBefore
+    if (line.divider) {
+      drawDivider(ctx, box.x, y + layout.lineHeight / 2, box.width)
+      y += layout.lineHeight
+      continue
+    }
+    await drawLine(ctx, env, line, BATTLE.rules, layout.fontSize, box.x, y)
+    y += layout.lineHeight
+  }
+}
+
+/**
+ * Casillas de defensa iniciales: el marco ya trae la estrella recortada
+ * (transparente), así que primero se rellena de un color liso a través de su
+ * máscara —igual que `fillMasked` con el borde o la corona de legendaria— y
+ * luego se escribe el número encima, en blanco.
+ */
+async function drawBattleDefense(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  if (design.defense.trim() === '') return
+
+  const mask = await env.loadAsset(paths.battleDefenseMask()).catch(() => undefined)
+  if (mask) fillMasked(ctx, env, '#1a1a1a', mask, scale)
+
+  drawOneLine(ctx, design.defense, BATTLE.defense, scale, { color: '#ffffff' })
 }
 
 /** Estampa fondo, ilustración y capa de marco sobre un contexto ya creado. */

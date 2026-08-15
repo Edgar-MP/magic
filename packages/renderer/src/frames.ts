@@ -378,6 +378,119 @@ export const SAGA = {
   },
 }
 
+/**
+ * Geometría del marco de Battle: apaisada (más ancha que alta, se juega
+ * girada 90°), con el arte arriba, una franja de tipo y un panel de reglas
+ * opaco abajo, y una insignia en forma de estrella de ocho puntas en la
+ * esquina inferior derecha con las casillas de defensa iniciales. Sólo cubre
+ * la cara frontal (de casillas); la trasera de una Battle real es una carta
+ * normal aparte y queda fuera de esta plantilla.
+ *
+ * El asset (`battle/*.png`) mide 2814×2010, con el mismo contenido que
+ * `js/frames/packBattle.js` de CardConjurer da como fracciones de 2100×1500
+ * (misma proporción, así que las fracciones son intercambiables), pero sus
+ * coordenadas de título/tipo/reglas no coincidían con el PNG real de este
+ * fork: se remidieron con `getImageData` sobre las máscaras oficiales
+ * (`maskTitle`, `maskType`, `maskRules`, `maskDefense`, todas del mismo
+ * tamaño que el marco), buscando el rectángulo opaco de cada una. El de
+ * `holoStamp` sí coincidía exactamente con el tamaño real de `holostamp.png`
+ * (124×249 = 93/2100 × 186/1500 de 2814×2010), así que ése se dejó tal cual.
+ */
+export const BATTLE = {
+  aspect: 2814 / 2010,
+  // Ventana de arte: el hueco transparente real del marco (medido en la
+  // columna x=0.5, buscando dónde el alfa cae a 0 y vuelve a subir), no los
+  // `artBounds` de CardConjurer (que dan casi toda la carta porque su panel
+  // de reglas, opaco, tapa el resto de todos modos).
+  art: { x: 0.0796, y: 0.1363, width: 0.892, height: 0.4334 },
+  // Alineado con el centro vertical de la franja de tipo (`maskType`), pegado
+  // a su filo derecho.
+  setSymbol: { x: 0.9392, y: 0.6172, width: 0.0612 * (2814 / 2010), height: 0.0612, align: 'right' as const },
+  // El filo izquierdo de la máscara (0.1087) cae dentro del emblema circular
+  // que trae el propio marco a la izquierda de la franja: el título tiene
+  // que empezar después de él (comprobado a ojo en el PNG, el círculo llega
+  // hasta x≈0.17), o el nombre le pisa el círculo.
+  title: {
+    x: 0.19,
+    y: 0.0463,
+    width: 0.7489,
+    height: 0.0831,
+    size: 0.055,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  mana: {
+    x: 0.19,
+    y: 0.0463,
+    width: 0.7489,
+    height: 0.0831,
+    size: 0.05,
+    font: 'title' as const,
+    align: 'right' as const,
+    oneLine: true,
+  },
+  // Un pelín más adentro que el filo medido de la máscara (0.1095): la franja
+  // es una píldora con las puntas redondeadas, y a la altura de la línea de
+  // base la "B" de un tipo largo llegaba a rozar el borde exterior.
+  type: {
+    x: 0.125,
+    y: 0.5766,
+    width: 0.8142,
+    height: 0.0811,
+    size: 0.045,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  // Mismo ajuste que en `type`: un poco más adentro que el filo de la
+  // máscara para no rozar el borde en la primera línea (el paréntesis del
+  // recordatorio quedaba pegado a él).
+  rules: {
+    x: 0.135,
+    y: 0.6652,
+    width: 0.8067,
+    height: 0.2885,
+    size: 0.0362,
+    font: 'body' as const,
+  },
+  /** Insignia de estrella de ocho puntas, ya recortada en el propio marco. */
+  defense: {
+    x: 0.8959,
+    y: 0.8662,
+    width: 0.0775,
+    height: 0.1104,
+    size: 0.05,
+    font: 'titleSmallCaps' as const,
+    align: 'center' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /** Etiqueta bajo el nombre: pegada al filo de abajo de la franja de título. */
+  note: {
+    x: 0.19,
+    y: 0.135,
+    width: 0.7489,
+    height: 0.03,
+    size: 0.02,
+    font: 'body' as const,
+    align: 'center' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /** Sello holográfico: sobre el borde, a la izquierda del arte. */
+  holoStamp: { x: 0.049, y: 0.438, width: 0.0443, height: 0.124 },
+  info: {
+    x: 0.135,
+    y: 0.963,
+    width: 0.8067,
+    height: 0.022,
+    size: 0.018,
+    font: 'body' as const,
+    color: '#ffffff',
+  },
+}
+
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */
 export const FONT_FAMILY: Record<FontRole, string> = {
   title: 'belerenb',
@@ -644,6 +757,25 @@ export const paths = {
   /** Insignia hexagonal dorada donde va el número romano de cada capítulo. */
   sagaChapterBadge(): string {
     return 'saga/sagaChapter.png'
+  },
+
+  /**
+   * El marco de Battle tiene una letra por archivo (sin distinguir tierra por
+   * color: sólo hay un `l.png`) y ninguno propio de vehículo, que cae al de
+   * artefacto igual que en el resto de plantillas especiales.
+   */
+  battleFrame(color: FrameColor): string {
+    if (isLandFrame(color)) return 'battle/l.png'
+    const actual = color === 'vehicle' ? 'artifact' : color
+    return `battle/${LETTER[actual].toLowerCase()}.png`
+  },
+
+  /**
+   * Máscara de la insignia de defensa: una estrella de ocho puntas recortada
+   * en el marco. Se rellena de un color liso antes de escribir el número.
+   */
+  battleDefenseMask(): string {
+    return 'battle/maskDefense.png'
   },
 
   /** Reverso clásico de Magic. */

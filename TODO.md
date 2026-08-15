@@ -1,23 +1,25 @@
 # Plantillas de carta que faltan
 
-Ya hechas: normal/tierra básica y **planeswalker** (marco, lealtad y habilidades).
+Ya hechas: normal/tierra básica, **planeswalker** (marco, lealtad y
+habilidades), **saga** (marco, capítulos y numerales romanos) y **battle**
+(marco apaisado, texto de reglas normal y casillas de defensa — sólo la cara
+frontal; la trasera es una carta normal aparte y queda pendiente como parte
+de Transform/DFC más abajo).
 
 Quedan estas plantillas propias (cada una es prácticamente un editor nuevo:
 sprites + estructura de datos + layout de render):
 
-1. **Saga** — capítulos numerados I/II/III(/IV) en vez de texto de reglas normal.
-2. **Class** — niveles con coste de mejora, tipo escalera (como Saga pero vertical).
-3. **Battle** — apaisada, con casillas de defensa.
-4. **Adventure** — dos hechizos en una sola carta (mitad conjuro + mitad criatura).
-5. **Split card** — dos cartas completas lado a lado (fuse).
-6. **Flip card** (Kamigawa clásico) — la misma carta boca abajo es otra.
-7. **Transform / doble cara** (DFC) — frente normal, dorso distinto.
-8. **Meld** — dos cartas que se combinan en una tercera más grande.
-9. **Case** (Duskmourn) — como Saga pero con una "solución" en vez de capítulos.
-10. **Vanguard / Plane / Scheme / Contraption** — formatos especiales, de nicho.
+1. **Class** — niveles con coste de mejora, tipo escalera (como Saga pero vertical).
+2. **Adventure** — dos hechizos en una sola carta (mitad conjuro + mitad criatura).
+3. **Split card** — dos cartas completas lado a lado (fuse).
+4. **Flip card** (Kamigawa clásico) — la misma carta boca abajo es otra.
+5. **Transform / doble cara** (DFC) — frente normal, dorso distinto. Incluye la
+   cara trasera de Battle, que hoy no se cubre.
+6. **Meld** — dos cartas que se combinan en una tercera más grande.
+7. **Case** (Duskmourn) — como Saga pero con una "solución" en vez de capítulos.
+8. **Vanguard / Plane / Scheme / Contraption** — formatos especiales, de nicho.
 
-De todas, las que más se juegan son Saga, Battle y Transform/DFC; el resto es
-más de nicho.
+De todas, la que más se juega es Transform/DFC; el resto es más de nicho.
 
 Los sprites de todas salen de la misma fuente que ya se usa
 (`fiahdrgn473/CardConjurer`, vía `scripts/fetch-assets.ts`).

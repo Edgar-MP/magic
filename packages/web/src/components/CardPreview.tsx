@@ -47,6 +47,10 @@ export function CardPreview({
   const artKey = design.art.blobId ?? design.art.url ?? ''
   const hasArt = artKey !== ''
   const interactive = Boolean(onArtChange) && hasArt
+  // Todas las plantillas son verticales salvo Battle, que es apaisada (se
+  // juega girada 90°): el hueco tiene que reservar su proporción real o el
+  // lienzo (que sí respeta su propio ancho/alto) deja hueco vacío debajo.
+  const isLandscape = design.layout === 'battle'
 
   // Mientras se arrastra, el encuadre bueno es el de la ref y no el de las props.
   if (!dragging.current) placement.current = design.art
@@ -208,9 +212,9 @@ export function CardPreview({
     <div className={className}>
       <div
         ref={holder}
-        className={`overflow-hidden rounded-xl bg-black/40 aspect-[63/88] ${
-          interactive ? (grabbing ? 'cursor-grabbing' : 'cursor-grab') : ''
-        }`}
+        className={`overflow-hidden rounded-xl bg-black/40 ${
+          isLandscape ? 'aspect-[7/5]' : 'aspect-[63/88]'
+        } ${interactive ? (grabbing ? 'cursor-grabbing' : 'cursor-grab') : ''}`}
         // `touch-none` evita que el navegador se quede el gesto para hacer scroll.
         style={interactive ? { touchAction: 'none' } : undefined}
         onPointerDown={(event) => {

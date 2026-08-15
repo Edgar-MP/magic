@@ -35,6 +35,8 @@ export const cardFaceSchema = z.object({
   power: z.string().optional(),
   toughness: z.string().optional(),
   loyalty: z.string().optional(),
+  /** Casillas de defensa iniciales de una Battle (sólo su cara frontal). */
+  defense: z.string().optional(),
   colors: z.array(colorSchema).optional(),
   artist: z.string().optional(),
   image_uris: imageUrisSchema.optional(),
@@ -58,6 +60,8 @@ export const cardSchema = z.object({
   power: z.string().optional(),
   toughness: z.string().optional(),
   loyalty: z.string().optional(),
+  /** Casillas de defensa de una Battle. Scryfall lo da a nivel de carta o de cara. */
+  defense: z.string().optional(),
   colors: z.array(colorSchema).optional(),
   color_identity: z.array(colorSchema).default([]),
   keywords: z.array(z.string()).optional(),
