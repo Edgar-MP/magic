@@ -274,11 +274,22 @@ async function drawPlaneswalkerBadges(
   design: ProxyDesign,
   scale: Scale,
 ): Promise<void> {
+  const box = px(PLANESWALKER.abilities, scale)
   const rows = planeswalkerRows(design, scale)
 
   for (const [i, ability] of design.abilities.entries()) {
     const row = rows[i]
     if (!row) continue
+
+    // La insignia cuelga a propósito del borde izquierdo (como en las cartas
+    // oficiales), pero nunca debe sobresalir por arriba o por abajo de su
+    // propia fila: si no, con pocas habilidades (fila muy alta) o un coste
+    // que fuerza la insignia a su tamaño máximo, la punta inferior del
+    // escudo se salía por debajo de la caja.
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, row.y, box.x + box.width, row.height)
+    ctx.clip()
 
     const sign = ability.cost.trim().startsWith('+')
       ? 'plus'
@@ -313,6 +324,7 @@ async function drawPlaneswalkerBadges(
     ctx.translate(textX, textY)
     ctx.scale(scaleX, 1)
     ctx.fillText(ability.cost, 0, 0)
+    ctx.restore()
     ctx.restore()
   }
 }
