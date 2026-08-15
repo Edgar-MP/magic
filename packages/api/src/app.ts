@@ -5,6 +5,7 @@ import { createAuth } from './auth/auth.js'
 import type { Env } from './env.js'
 import { requireAuth, type AppEnv } from './middleware/auth.js'
 import { artRoutes } from './modules/art/art.routes.js'
+import { shareRoutes } from './modules/share/share.routes.js'
 import { syncRoutes } from './modules/sync/sync.routes.js'
 import { serveStaticFile } from './static.js'
 
@@ -40,6 +41,9 @@ export function createApp(env: Env) {
 
   app.use('/v1/art/*', session)
   app.route('/v1/art', artRoutes(env))
+
+  // Público a propósito: es el enlace de «compartir mazo», sin sesión.
+  app.route('/v1/share', shareRoutes(env))
 
   // Todo lo que no es la API sale del directorio de la web.
   app.on(['GET', 'HEAD'], '/*', async (c) => {

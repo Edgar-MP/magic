@@ -103,6 +103,7 @@ model Deck {
   format          String
   entries         Json
   notes           String?
+  shareToken      String?   @unique
   createdAt       DateTime
   updatedAt       DateTime
   deletedAt       DateTime?

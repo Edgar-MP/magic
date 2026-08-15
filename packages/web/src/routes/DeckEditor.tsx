@@ -29,6 +29,7 @@ import { CATEGORY_ORDER, Issues, Stats, categoryOf } from '../components/DeckPan
 import { ManaCost } from '../components/ManaCost.js'
 import { DecklistIO } from '../components/DecklistIO.js'
 import { PrintDialog } from '../components/PrintDialog.js'
+import { ShareDialog } from '../components/ShareDialog.js'
 import { newId, saveDeck, useCardMap, useDeck, useProxies } from '../lib/db-hooks.js'
 
 type View = 'list' | 'grid'
@@ -45,6 +46,7 @@ export function DeckEditor() {
 
   const [showIO, setShowIO] = useState(false)
   const [showPrint, setShowPrint] = useState(false)
+  const [showShare, setShowShare] = useState(false)
   const [view, setView] = useState<View>('list')
 
   if (deck === undefined) {
@@ -169,6 +171,13 @@ export function DeckEditor() {
         >
           Imprimir
         </button>
+        <button
+          type="button"
+          onClick={() => setShowShare(true)}
+          className="rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+        >
+          Compartir
+        </button>
         <div className="flex overflow-hidden rounded border border-edge text-sm">
           <button
             type="button"
@@ -261,6 +270,7 @@ export function DeckEditor() {
       {showPrint && (
         <PrintDialog deck={deck} cards={cards} onClose={() => setShowPrint(false)} />
       )}
+      {showShare && <ShareDialog deck={deck} onClose={() => setShowShare(false)} />}
     </div>
   )
 }

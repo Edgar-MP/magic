@@ -8,6 +8,7 @@ import { DeckProxies } from './routes/DeckProxies.js'
 import { Collection } from './routes/Collection.js'
 import { Proxies } from './routes/Proxies.js'
 import { ProxyEditor } from './routes/ProxyEditor.js'
+import { SharedDeck } from './routes/SharedDeck.js'
 
 const NAV = [
   { to: '/decks', label: 'Mazos' },
@@ -54,6 +55,7 @@ export function App() {
             <Route path="/proxies" element={<Proxies />} />
             <Route path="/proxies/:id" element={<ProxyEditor />} />
             <Route path="/collection" element={<Collection />} />
+            <Route path="/share/:token" element={<SharedDeck />} />
             <Route path="*" element={<p className="text-muted">No hay nada aquí.</p>} />
           </Routes>
         </main>

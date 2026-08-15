@@ -21,6 +21,7 @@ export const syncDeckSchema = z.object({
   format: formatSchema,
   entries: z.array(deckEntrySchema),
   notes: z.string().optional(),
+  shareToken: z.string().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
   deletedAt: z.number().nullish(),

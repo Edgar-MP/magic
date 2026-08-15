@@ -27,11 +27,19 @@ export function CardPreview({
   width = PREVIEW_WIDTH,
   className,
   onArtChange,
+  shareToken,
 }: {
   design: ProxyDesign
   width?: number
   className?: string
   onArtChange?: (art: ArtPlacement) => void
+  /**
+   * Token de un mazo compartido: si no hay blob local y el diseño trae
+   * `art.blobId` (imagen del dueño original, no descargada en este
+   * navegador), se intenta `GET /v1/share/:token/art/:blobId` como tercera
+   * vía, después del blob local y de `art.url`.
+   */
+  shareToken?: string
 }) {
   const holder = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLCanvasElement | null>(null)
@@ -154,7 +162,17 @@ export function CardPreview({
     let cancelled = false
     void (async () => {
       try {
-        const source = design.art.blobId ? await getBlob(design.art.blobId) : design.art.url
+        let source: Blob | string | undefined = design.art.blobId
+          ? await getBlob(design.art.blobId)
+          : design.art.url
+
+        // Sin blob local ni URL: si venimos de una vista de mazo compartido,
+        // el arte puede estar en el servidor del dueño original.
+        if (!source && design.art.blobId && shareToken) {
+          const response = await fetch(`/v1/share/${shareToken}/art/${design.art.blobId}`)
+          if (response.ok) source = await response.blob()
+        }
+
         if (!source) return
         const image = await browserEnv.loadImage(source)
         if (cancelled) return

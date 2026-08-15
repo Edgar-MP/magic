@@ -45,6 +45,8 @@ export const deckSchema = z.object({
   format: formatSchema,
   entries: z.array(deckEntrySchema).default([]),
   notes: z.string().optional(),
+  /** Token público para el enlace de «compartir mazo». Ausente = no compartido. */
+  shareToken: z.string().optional(),
   createdAt: z.number(),
   updatedAt: z.number(),
 })

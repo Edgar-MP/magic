@@ -49,6 +49,7 @@ function deckToWire(deck: StoredDeck): SyncDeck {
     format: deck.format,
     entries: deck.entries,
     ...(deck.notes !== undefined ? { notes: deck.notes } : {}),
+    ...(deck.shareToken !== undefined ? { shareToken: deck.shareToken } : {}),
     createdAt: deck.createdAt,
     updatedAt: deck.updatedAt,
     deletedAt: deck.deletedAt ?? null,
@@ -188,6 +189,9 @@ export async function runSync({ userId, transport }: SyncOptions): Promise<SyncR
         format: deck.format,
         entries: deck.entries,
         ...(deck.notes !== undefined && deck.notes !== null ? { notes: deck.notes } : {}),
+        ...(deck.shareToken !== undefined && deck.shareToken !== null
+          ? { shareToken: deck.shareToken }
+          : {}),
         createdAt: deck.createdAt,
         updatedAt: deck.updatedAt,
         ...(deck.deletedAt ? { deletedAt: deck.deletedAt } : {}),
