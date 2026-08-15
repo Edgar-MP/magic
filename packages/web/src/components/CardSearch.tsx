@@ -2,7 +2,61 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { indexReady, loadIndex, putCards, scryfall, searchLocal, type StoredProxy } from '@magic/cards'
 import type { Card } from '@magic/shared'
+import { CardPreview } from './CardPreview.js'
 import { ManaCost } from './ManaCost.js'
+
+interface HoverState {
+  x: number
+  y: number
+  /** Id del índice local: la sugerencia no trae imagen, hay que traerla. */
+  localId?: string
+  image?: string
+  proxy?: StoredProxy
+}
+
+/**
+ * Imagen flotante que sigue al cursor, igual que en la lista de un mazo
+ * (`DeckEditor.tsx`): las sugerencias solo traen nombre/tipo, así que sin
+ * esto no había forma de ver la carta antes de añadirla.
+ */
+function HoverPreview({ hover }: { hover: HoverState | null }) {
+  const [localCard, setLocalCard] = useState<Card | null>(null)
+
+  useEffect(() => {
+    if (!hover?.localId) {
+      setLocalCard(null)
+      return
+    }
+    let cancelled = false
+    scryfall.byId(hover.localId).then((card) => {
+      if (!cancelled) setLocalCard(card ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [hover?.localId])
+
+  if (!hover) return null
+  const image =
+    hover.image ?? localCard?.image_uris?.normal ?? localCard?.card_faces?.[0]?.image_uris?.normal
+  if (!hover.proxy && !image) return null
+
+  return (
+    <div
+      className="pointer-events-none fixed z-50 w-56 overflow-hidden rounded-lg border border-edge bg-panel shadow-xl"
+      style={{
+        left: Math.min(hover.x + 16, window.innerWidth - 232),
+        top: Math.min(hover.y + 16, window.innerHeight - 320),
+      }}
+    >
+      {hover.proxy ? (
+        <CardPreview design={hover.proxy} width={220} className="w-full" />
+      ) : (
+        <img src={image} alt="" className="w-full" />
+      )}
+    </div>
+  )
+}
 
 /**
  * Buscador de cartas. Mientras escribes usa el índice local (instantáneo, sin
@@ -55,6 +109,7 @@ export function CardSearch({
   onPickProxy,
 }: CardSearchProps) {
   const [text, setText] = useState('')
+  const [hover, setHover] = useState<HoverState | null>(null)
   const [remoteQuery, setRemoteQuery] = useState('')
   const hasIndex = useLocalIndex()
 
@@ -147,6 +202,9 @@ export function CardSearch({
                   onPickProxy?.(proxy)
                   setText('')
                 }}
+                onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, proxy })}
+                onMouseMove={(e) => setHover({ x: e.clientX, y: e.clientY, proxy })}
+                onMouseLeave={() => setHover(null)}
                 className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-edge"
               >
                 <span className="truncate">{proxy.text.name || 'Sin nombre'}</span>
@@ -166,6 +224,9 @@ export function CardSearch({
               <button
                 type="button"
                 onClick={() => void pickLocal(entry.id)}
+                onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, localId: entry.id })}
+                onMouseMove={(e) => setHover({ x: e.clientX, y: e.clientY, localId: entry.id })}
+                onMouseLeave={() => setHover(null)}
                 className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-edge"
               >
                 <span className="truncate">{entry.name}</span>
@@ -193,6 +254,21 @@ export function CardSearch({
                 <button
                   type="button"
                   onClick={() => pickRemote(card)}
+                  onMouseEnter={(e) =>
+                    setHover({
+                      x: e.clientX,
+                      y: e.clientY,
+                      image: card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal,
+                    })
+                  }
+                  onMouseMove={(e) =>
+                    setHover({
+                      x: e.clientX,
+                      y: e.clientY,
+                      image: card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal,
+                    })
+                  }
+                  onMouseLeave={() => setHover(null)}
                   className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-sm hover:bg-edge"
                 >
                   <span className="truncate">{card.name}</span>
@@ -210,6 +286,8 @@ export function CardSearch({
       {remote.data && remote.data.cards.length === 0 && (
         <p className="text-xs text-muted">Sin resultados.</p>
       )}
+
+      <HoverPreview hover={hover} />
     </div>
   )
 }
