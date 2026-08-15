@@ -255,6 +255,8 @@ export function splitPartnerDesignOf(
     isBackFace: false,
     splitPartnerId: firstId,
     isSplitPartner: true,
+    flipPartnerId: null,
+    isFlipPartner: false,
     adventure: null,
     createdAt: now,
     updatedAt: now,

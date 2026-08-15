@@ -63,6 +63,15 @@ const FRAME_LABELS: Record<FrameColor, string> = {
   colorlessLand: 'Tierra incolora',
 }
 
+/**
+ * Saga, Battle, Class, doble cara (Transform), Split, Flip y Adventure ya
+ * están implementados de punta a punta (render, import de Scryfall, tests),
+ * pero se ocultan del editor a propósito: se van a ir activando uno a uno a
+ * mano según se pida. Cambiar esto a `true` (o borrar el `false` a secas)
+ * reactiva todas las secciones de golpe sin tocar nada más.
+ */
+const SHOW_HIDDEN_LAYOUTS = false
+
 export function ProxyEditor() {
   const { id } = useParams<{ id: string }>()
   const design = useProxy(id)
@@ -368,21 +377,28 @@ export function ProxyEditor() {
               checked={draft.layout === 'planeswalker'}
               onChange={(v) => update({ layout: v ? 'planeswalker' : 'card' })}
             />
-            <Toggle
-              label="Saga (capítulos numerados)"
-              checked={draft.layout === 'saga'}
-              onChange={(v) => update({ layout: v ? 'saga' : 'card' })}
-            />
-            <Toggle
-              label="Battle (casillas de defensa)"
-              checked={draft.layout === 'battle'}
-              onChange={(v) => update({ layout: v ? 'battle' : 'card' })}
-            />
-            <Toggle
-              label="Class (niveles)"
-              checked={draft.layout === 'class'}
-              onChange={(v) => update({ layout: v ? 'class' : 'card' })}
-            />
+            {/*
+             * Saga, Battle y Class ya están implementadas (render, import de
+             * Scryfall, tests) pero se ocultan del editor a propósito: se van
+             * a ir activando una a una a mano. Para reactivar una, basta con
+             * descomentar su <Toggle> — no hace falta tocar nada más.
+             *
+             * <Toggle
+             *   label="Saga (capítulos numerados)"
+             *   checked={draft.layout === 'saga'}
+             *   onChange={(v) => update({ layout: v ? 'saga' : 'card' })}
+             * />
+             * <Toggle
+             *   label="Battle (casillas de defensa)"
+             *   checked={draft.layout === 'battle'}
+             *   onChange={(v) => update({ layout: v ? 'battle' : 'card' })}
+             * />
+             * <Toggle
+             *   label="Class (niveles)"
+             *   checked={draft.layout === 'class'}
+             *   onChange={(v) => update({ layout: v ? 'class' : 'card' })}
+             * />
+             */}
 
             {draft.layout === 'card' && (
               <label className="flex flex-col gap-1 text-sm">
@@ -517,7 +533,7 @@ export function ProxyEditor() {
             </div>
           </Section>
 
-          {!draft.isBackFace && (
+          {SHOW_HIDDEN_LAYOUTS && !draft.isBackFace && (
             <Section title="Reverso">
               {draft.backFaceId ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -555,7 +571,7 @@ export function ProxyEditor() {
             </Section>
           )}
 
-          {draft.isBackFace && (
+          {SHOW_HIDDEN_LAYOUTS && draft.isBackFace && (
             <Section title="Reverso">
               <p className="text-sm text-muted">
                 Esta carta ES el dorso de otra. Se gestiona desde el editor del frente.
@@ -563,7 +579,7 @@ export function ProxyEditor() {
             </Section>
           )}
 
-          {!draft.isSplitPartner && (
+          {SHOW_HIDDEN_LAYOUTS && !draft.isSplitPartner && (
             <Section title="Split">
               {draft.splitPartnerId ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -602,7 +618,7 @@ export function ProxyEditor() {
             </Section>
           )}
 
-          {draft.isSplitPartner && (
+          {SHOW_HIDDEN_LAYOUTS && draft.isSplitPartner && (
             <Section title="Split">
               <p className="text-sm text-muted">
                 Esta carta ES la otra mitad de una Split. Se gestiona desde el editor de la
@@ -611,7 +627,7 @@ export function ProxyEditor() {
             </Section>
           )}
 
-          {!draft.isFlipPartner && (
+          {SHOW_HIDDEN_LAYOUTS && !draft.isFlipPartner && (
             <Section title="Flip">
               {draft.flipPartnerId ? (
                 <div className="flex flex-wrap items-center gap-2">
@@ -650,7 +666,7 @@ export function ProxyEditor() {
             </Section>
           )}
 
-          {draft.isFlipPartner && (
+          {SHOW_HIDDEN_LAYOUTS && draft.isFlipPartner && (
             <Section title="Flip">
               <p className="text-sm text-muted">
                 Esta carta ES la otra cara de una Flip. Se gestiona desde el editor de la
@@ -803,43 +819,45 @@ export function ProxyEditor() {
             </Section>
           )}
 
-          <Section title="Aventura">
-            <Toggle
-              label="Esta carta tiene un hechizo de aventura"
-              checked={draft.adventure !== null}
-              onChange={(v) =>
-                update({
-                  adventure: v ? { name: '', mana: '', type: '', oracle: '' } : null,
-                })
-              }
-            />
-            {draft.adventure && (
-              <>
-                <Field
-                  label="Nombre"
-                  value={draft.adventure.name}
-                  onChange={(v) => setAdventure({ name: v })}
-                />
-                <Field
-                  label="Maná"
-                  value={draft.adventure.mana}
-                  onChange={(v) => setAdventure({ mana: v })}
-                  hint="Notación de Scryfall: {1}{R}"
-                />
-                <Field
-                  label="Tipo"
-                  value={draft.adventure.type}
-                  onChange={(v) => setAdventure({ type: v })}
-                />
-                <RichTextField
-                  label="Texto de reglas"
-                  value={draft.adventure.oracle}
-                  onChange={(v) => setAdventure({ oracle: v })}
-                  compact
-                />
-              </>
-            )}
-          </Section>
+          {SHOW_HIDDEN_LAYOUTS && (
+            <Section title="Aventura">
+              <Toggle
+                label="Esta carta tiene un hechizo de aventura"
+                checked={draft.adventure !== null}
+                onChange={(v) =>
+                  update({
+                    adventure: v ? { name: '', mana: '', type: '', oracle: '' } : null,
+                  })
+                }
+              />
+              {draft.adventure && (
+                <>
+                  <Field
+                    label="Nombre"
+                    value={draft.adventure.name}
+                    onChange={(v) => setAdventure({ name: v })}
+                  />
+                  <Field
+                    label="Maná"
+                    value={draft.adventure.mana}
+                    onChange={(v) => setAdventure({ mana: v })}
+                    hint="Notación de Scryfall: {1}{R}"
+                  />
+                  <Field
+                    label="Tipo"
+                    value={draft.adventure.type}
+                    onChange={(v) => setAdventure({ type: v })}
+                  />
+                  <RichTextField
+                    label="Texto de reglas"
+                    value={draft.adventure.oracle}
+                    onChange={(v) => setAdventure({ oracle: v })}
+                    compact
+                  />
+                </>
+              )}
+            </Section>
+          )}
         </div>
       </div>
 

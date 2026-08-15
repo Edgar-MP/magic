@@ -33,10 +33,23 @@ const deck = (id: string, name: string): Deck => ({
 
 const proxy = (id: string): ProxyDesign => ({
   id,
+  layout: 'card',
   frameSet: 'm15',
   variant: 'regular',
   edited: false,
   frameColor: 'red',
+  loyalty: '',
+  abilities: [],
+  chapters: [],
+  levels: [],
+  defense: '',
+  backFaceId: null,
+  isBackFace: false,
+  splitPartnerId: null,
+  isSplitPartner: false,
+  flipPartnerId: null,
+  isFlipPartner: false,
+  adventure: null,
   flags: { legendary: false, nyx: false, stamp: false, showPt: false },
   art: { x: 0, y: 0, scale: 1 },
   text: {
