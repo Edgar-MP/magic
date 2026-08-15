@@ -375,9 +375,22 @@ function DeckRow({
   ]
 
   const displayName = proxy?.text.name || card?.name || entry.cardId
+  const image = card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal
+
+  // Sigue al cursor en vez de anclarse a la fila: en la vista de lista las
+  // filas son angostas y una carta entera no cabe pegada a un lado sin
+  // salirse de la columna.
+  const [hover, setHover] = useState<{ x: number; y: number } | null>(null)
+  const trackHover = (e: { clientX: number; clientY: number }) =>
+    setHover({ x: e.clientX, y: e.clientY })
 
   return (
-    <li className="group flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-edge/40">
+    <li
+      className="group relative flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-edge/40"
+      onMouseEnter={trackHover}
+      onMouseMove={trackHover}
+      onMouseLeave={() => setHover(null)}
+    >
       <div className="flex items-center gap-1">
         <button
           type="button"
@@ -447,6 +460,22 @@ function DeckRow({
           </button>
         )}
       </span>
+
+      {hover && (proxy || image) && (
+        <div
+          className="pointer-events-none fixed z-50 w-56 overflow-hidden rounded-lg border border-edge bg-panel shadow-xl"
+          style={{
+            left: Math.min(hover.x + 16, window.innerWidth - 232),
+            top: Math.min(hover.y + 16, window.innerHeight - 320),
+          }}
+        >
+          {proxy ? (
+            <CardPreview design={proxy} width={220} className="w-full" />
+          ) : (
+            <img src={image} alt={displayName} className="w-full" />
+          )}
+        </div>
+      )}
     </li>
   )
 }
