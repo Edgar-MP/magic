@@ -150,12 +150,12 @@ export async function getDeck(id: string): Promise<StoredDeck | undefined> {
 
 /**
  * Proxies «normales», para listados de mis proxies o para elegir cartas de un
- * mazo. Los dorsos de doble cara y las mitades de Split no cuentan como
- * proxies sueltos: sólo se llega a ellos desde su frente/pareja.
+ * mazo. Los dorsos de doble cara, las mitades de Split y las caras de Flip no
+ * cuentan como proxies sueltos: sólo se llega a ellos desde su frente/pareja.
  */
 export async function listProxies(): Promise<StoredProxy[]> {
   const proxies = await db.proxies.orderBy('updatedAt').reverse().toArray()
-  return proxies.filter((p) => isAlive(p) && !p.isBackFace && !p.isSplitPartner)
+  return proxies.filter((p) => isAlive(p) && !p.isBackFace && !p.isSplitPartner && !p.isFlipPartner)
 }
 
 export async function getProxy(id: string): Promise<StoredProxy | undefined> {
@@ -181,9 +181,10 @@ export async function softDeleteDeck(id: string): Promise<void> {
  * Borra un proxy y, si es un frente con dorso, borra también el dorso
  * vinculado; si es un dorso, desvincula el frente que apuntaba a él para que
  * no se quede con un `backFaceId` colgando de un registro borrado. Lo mismo
- * para `splitPartnerId`/`isSplitPartner`, en paralelo y de forma independiente
- * (una carta podría en teoría tener dorso Y mitad de Split a la vez, aunque no
- * se dé en ninguna carta real).
+ * para `splitPartnerId`/`isSplitPartner` y `flipPartnerId`/`isFlipPartner`, en
+ * paralelo y de forma independiente (una carta podría en teoría tener dorso Y
+ * mitad de Split Y cara de Flip a la vez, aunque no se dé en ninguna carta
+ * real).
  */
 export async function softDeleteProxy(id: string): Promise<void> {
   const now = Date.now()
@@ -211,6 +212,17 @@ export async function softDeleteProxy(id: string): Promise<void> {
     // mano la otra mitad que apunta a esta.
     const partner = await db.proxies.filter((p) => p.splitPartnerId === id).first()
     if (partner) await db.proxies.update(partner.id, { splitPartnerId: null, updatedAt: now })
+  }
+
+  if (proxy?.flipPartnerId) {
+    await db.proxies.update(proxy.flipPartnerId, { deletedAt: now, updatedAt: now })
+  }
+
+  if (proxy?.isFlipPartner) {
+    // Igual que con Split: no hay índice por `flipPartnerId`, se busca a mano
+    // la otra cara que apunta a esta.
+    const partner = await db.proxies.filter((p) => p.flipPartnerId === id).first()
+    if (partner) await db.proxies.update(partner.id, { flipPartnerId: null, updatedAt: now })
   }
 }
 
@@ -304,6 +316,48 @@ export async function removeSplitPartner(firstId: string): Promise<void> {
 }
 
 /**
+ * Crea la otra cara de una Flip existente: un `ProxyDesign` nuevo, en blanco
+ * salvo el color de marco (igual que `createBackFace`/`createSplitPartner`),
+ * marcado `isFlipPartner`, y vincula su id en el `flipPartnerId` de la
+ * primera cara. Devuelve la cara creada.
+ */
+export async function createFlipPartner(firstId: string): Promise<StoredProxy> {
+  const first = await getProxy(firstId)
+  if (!first) throw new Error(`No existe el proxy ${firstId}`)
+  if (first.flipPartnerId) throw new Error('Este proxy ya tiene otra cara')
+
+  const now = Date.now()
+  const base = proxyDesignSchema.parse({
+    id: crypto.randomUUID(),
+    frameColor: first.frameColor,
+    createdAt: now,
+    updatedAt: now,
+  })
+  const partner: StoredProxy = {
+    ...base,
+    isFlipPartner: true,
+    text: { ...base.text, name: first.text.name ? `${first.text.name} (cara)` : '' },
+  }
+
+  await db.proxies.add(partner)
+  await db.proxies.update(firstId, { flipPartnerId: partner.id, updatedAt: now })
+  return partner
+}
+
+/**
+ * Quita la otra cara de una Flip: la borra (borrado lógico) y limpia el
+ * `flipPartnerId` de la primera cara.
+ */
+export async function removeFlipPartner(firstId: string): Promise<void> {
+  const first = await getProxy(firstId)
+  if (!first?.flipPartnerId) return
+
+  const now = Date.now()
+  await db.proxies.update(first.flipPartnerId, { deletedAt: now, updatedAt: now })
+  await db.proxies.update(firstId, { flipPartnerId: null, updatedAt: now })
+}
+
+/**
  * Completa un proxy con los valores por defecto del esquema. Devuelve el mismo
  * objeto si ya estaba completo, para no crear basura en cada lectura.
  */
@@ -319,7 +373,9 @@ export function normalizeProxy(proxy: ProxyDesign): ProxyDesign {
     proxy.backFaceId !== undefined &&
     proxy.isBackFace !== undefined &&
     proxy.splitPartnerId !== undefined &&
-    proxy.isSplitPartner !== undefined
+    proxy.isSplitPartner !== undefined &&
+    proxy.flipPartnerId !== undefined &&
+    proxy.isFlipPartner !== undefined
   ) {
     return proxy
   }

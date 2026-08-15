@@ -241,6 +241,22 @@ export const proxyDesignSchema = z.object({
    */
   isSplitPartner: z.boolean().default(false),
   /**
+   * Flip (Kamigawa clásico: Erayo, Soratami Ascendant // Erayo's Essence): si
+   * no es `null`, el `id` de OTRO proxy de la misma colección que es la otra
+   * cara de esta. Igual que `splitPartnerId`/`backFaceId`: dos `ProxyDesign`
+   * completos e independientes enlazados. La diferencia frente a Split es sólo
+   * de composición, no de datos: en Flip las dos caras comparten la MISMA
+   * mitad física de la carta cada una (arriba en su orientación normal, abajo
+   * la otra cara rotada 180°, ver `renderFlip`), no lado a lado rotadas 90°.
+   */
+  flipPartnerId: z.string().nullable().default(null),
+  /**
+   * Marca que ESTE proxy es la otra cara de una Flip. Igual que
+   * `isSplitPartner`: lo oculta de los listados de «mis proxies» y evita que
+   * se trate como una carta suelta.
+   */
+  isFlipPartner: z.boolean().default(false),
+  /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.
    */

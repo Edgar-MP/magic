@@ -21,10 +21,12 @@ import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
 import {
   createBackFace,
+  createFlipPartner,
   createSplitPartner,
   deleteProxy,
   newId,
   removeBackFace,
+  removeFlipPartner,
   removeSplitPartner,
   useProxy,
 } from '../lib/db-hooks.js'
@@ -196,6 +198,25 @@ export function ProxyEditor() {
     if (!confirm('¿Quitar y borrar la otra mitad de esta Split?')) return
     await removeSplitPartner(draft.id)
     setDraft((current) => (current ? { ...current, splitPartnerId: null } : current))
+  }
+
+  /** Mismo patrón que `addSplitPartner`/`removeSplit`, para la otra cara de una Flip. */
+  const addFlipPartner = async () => {
+    setStatus('Creando la otra cara…')
+    try {
+      const partnerId = await createFlipPartner(draft.id)
+      setDraft((current) => (current ? { ...current, flipPartnerId: partnerId } : current))
+      setStatus(null)
+      navigate(`/proxies/${partnerId}`)
+    } catch (error) {
+      setStatus(`Error: ${(error as Error).message}`)
+    }
+  }
+
+  const removeFlip = async () => {
+    if (!confirm('¿Quitar y borrar la otra cara de esta Flip?')) return
+    await removeFlipPartner(draft.id)
+    setDraft((current) => (current ? { ...current, flipPartnerId: null } : current))
   }
 
   const exportJson = async () => {
@@ -586,6 +607,54 @@ export function ProxyEditor() {
               <p className="text-sm text-muted">
                 Esta carta ES la otra mitad de una Split. Se gestiona desde el editor de la
                 primera mitad.
+              </p>
+            </Section>
+          )}
+
+          {!draft.isFlipPartner && (
+            <Section title="Flip">
+              {draft.flipPartnerId ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-muted">Esta carta es una cara de una Flip.</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/proxies/${draft.flipPartnerId}`)}
+                    className="rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+                  >
+                    Editar la otra cara
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeFlip()}
+                    className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-red-500 hover:text-red-400"
+                  >
+                    Quitar otra cara
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted">
+                    Carta Flip (Erayo, Soratami Ascendant // Erayo's Essence): crea la otra cara
+                    como una carta completa aparte, vinculada a esta. Las dos se imprimen juntas
+                    en la misma carta física, cada una en su mitad, la segunda cabeza abajo.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void addFlipPartner()}
+                    className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+                  >
+                    Añadir otra cara
+                  </button>
+                </div>
+              )}
+            </Section>
+          )}
+
+          {draft.isFlipPartner && (
+            <Section title="Flip">
+              <p className="text-sm text-muted">
+                Esta carta ES la otra cara de una Flip. Se gestiona desde el editor de la
+                primera cara.
               </p>
             </Section>
           )}

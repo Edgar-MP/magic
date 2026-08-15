@@ -1,5 +1,5 @@
 import { getBlob, getProxy } from '@magic/cards'
-import { PRINT_WIDTH, renderCard, renderCardBack, renderSplit } from '@magic/renderer'
+import { PRINT_WIDTH, renderCard, renderCardBack, renderFlip, renderSplit } from '@magic/renderer'
 import type { Card, Deck, ProxyDesign } from '@magic/shared'
 import { browserEnv } from '../env-browser.js'
 import type { PrintCard } from './pdf.js'
@@ -36,6 +36,28 @@ export async function renderSplitToPng(first: ProxyDesign, second: ProxyDesign):
     width: PRINT_WIDTH,
     ...(firstArt ? { leftArt: firstArt } : {}),
     ...(secondArt ? { rightArt: secondArt } : {}),
+  })
+  const blob = await surface.toBlob('image/png')
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+/**
+ * Renderiza una Flip (las dos caras ya compuestas, una arriba normal y otra
+ * abajo rotada 180°) a PNG al tamaño de impresión. Igual que Split, esto es
+ * UNA sola posición en la rejilla de impresión, no dos — pero, a diferencia
+ * de Split, el resultado es retrato (misma proporción que una carta normal),
+ * así que `pdf.ts` la coloca sin rotarla en la rejilla.
+ */
+export async function renderFlipToPng(top: ProxyDesign, bottom: ProxyDesign): Promise<Uint8Array> {
+  const [topArt, bottomArt] = await Promise.all([
+    top.art.blobId ? getBlob(top.art.blobId) : undefined,
+    bottom.art.blobId ? getBlob(bottom.art.blobId) : undefined,
+  ])
+
+  const surface = await renderFlip(top, bottom, browserEnv, {
+    width: PRINT_WIDTH,
+    ...(topArt ? { topArt } : {}),
+    ...(bottomArt ? { bottomArt } : {}),
   })
   const blob = await surface.toBlob('image/png')
   return new Uint8Array(await blob.arrayBuffer())
@@ -124,6 +146,15 @@ export async function renderDeckForPrint(
         const partner = await getProxy(design.splitPartnerId)
         result.cards.push({
           bytes: partner ? await renderSplitToPng(design, partner) : await renderProxyToPng(design),
+          type: 'png',
+          qty: entry.qty,
+        })
+      } else if (design?.flipPartnerId) {
+        // Flip: las dos caras van compuestas en una sola posición de la
+        // rejilla, no como dos cartas sueltas.
+        const partner = await getProxy(design.flipPartnerId)
+        result.cards.push({
+          bytes: partner ? await renderFlipToPng(design, partner) : await renderProxyToPng(design),
           type: 'png',
           qty: entry.qty,
         })

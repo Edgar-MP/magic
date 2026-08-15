@@ -261,6 +261,88 @@ export function splitPartnerDesignOf(
   }
 }
 
+/**
+ * Flip (`layout: 'flip'`, como Erayo, Soratami Ascendant // Erayo's Essence,
+ * Nezumi Graverobber // Nezumi Shadow-Watcher, del bloque clásico de
+ * Kamigawa): al igual que Split, las dos caras son cartas completas e
+ * independientes (cada una con su propio nombre/coste/tipo/texto/PT), así que
+ * se modelan igual: DOS `ProxyDesign` normales (uno por `cardToDesign`, con
+ * `card_faces[0]`, y otro con `flipPartnerDesignOf`, con `card_faces[1]`),
+ * enlazados por `flipPartnerId`/`isFlipPartner` — quien llame decide si los
+ * persiste. Lo que cambia frente a Split es sólo la composición física (ver
+ * `renderFlip` en el renderizador): en la carta real, las dos caras comparten
+ * la misma superficie impresa, cada una en su mitad, la segunda cabeza abajo;
+ * aquí, en cambio, cada cara se sigue modelando como un `ProxyDesign`
+ * COMPLETO (con su propio marco entero), porque `renderFlip` renderiza cada
+ * cara entera con `renderCard` y la encoge a su mitad — no hay layout
+ * `'flip'` especial, igual que no lo hay `'split'`.
+ */
+export function isFlipCard(card: Card): boolean {
+  return card.layout === 'flip' && (card.card_faces?.length ?? 0) >= 2
+}
+
+/**
+ * La segunda cara de una Flip, como `ProxyDesign` independiente ya vinculado
+ * (`isFlipPartner: true`) a `firstId`. Quien llame tiene que vincular también
+ * `flipPartnerId` en la primera cara (normalmente el resultado de
+ * `cardToDesign`) antes de guardar ambas.
+ */
+export function flipPartnerDesignOf(
+  card: Card,
+  { id, now, firstId }: CardToDesignOptions & { firstId: string },
+): ProxyDesign | null {
+  const face = card.card_faces?.[1]
+  if (!isFlipCard(card) || !face) return null
+
+  const frame = chooseFrame(card)
+  const power = face.power
+  const toughness = face.toughness
+  const pt = power !== undefined && toughness !== undefined ? `${power}/${toughness}` : (face.loyalty ?? '')
+
+  return {
+    id,
+    sourceCardId: card.id,
+    layout: 'card',
+    frameSet: 'm15',
+    variant: 'regular',
+    edited: false,
+    frameColor: frame.frameColor,
+    ...(frame.secondColor ? { secondColor: frame.secondColor } : {}),
+    flags: {
+      legendary: isLegendary(card),
+      nyx: false,
+      stamp: wantsStamp(card),
+      showPt: pt !== '',
+    },
+    art: { x: 0, y: 0, scale: 1 },
+    text: {
+      name: face.name,
+      mana: face.mana_cost ?? '',
+      type: face.type_line ?? '',
+      oracle: face.oracle_text ?? '',
+      flavor: face.flavor_text ?? '',
+      note: '',
+      pt,
+      artist: face.artist ?? card.artist ?? '',
+      info: infoLine(card),
+    },
+    loyalty: '',
+    abilities: [],
+    chapters: [],
+    levels: [],
+    defense: '',
+    backFaceId: null,
+    isBackFace: false,
+    splitPartnerId: null,
+    isSplitPartner: false,
+    flipPartnerId: firstId,
+    isFlipPartner: true,
+    adventure: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
 /** Línea inferior: `M10 · 146 · ES`, como la de las cartas reales. */
 function infoLine(card: Card): string {
   return [card.set.toUpperCase(), card.collector_number, card.rarity?.[0]?.toUpperCase()]
@@ -278,14 +360,20 @@ export interface CardToDesignOptions {
    * `splitPartnerDesignOf`), para dejarlo enlazado en `splitPartnerId`.
    */
   splitPartnerId?: string
+  /**
+   * Sólo para Flip: el id que va a tener la otra cara (creada aparte con
+   * `flipPartnerDesignOf`), para dejarlo enlazado en `flipPartnerId`.
+   */
+  flipPartnerId?: string
 }
 
 export function cardToDesign(
   card: Card,
-  { id, now, useOfficialArt = true, splitPartnerId }: CardToDesignOptions,
+  { id, now, useOfficialArt = true, splitPartnerId, flipPartnerId }: CardToDesignOptions,
 ): ProxyDesign {
   const face = card.card_faces?.[0]
   const split = isSplitCard(card)
+  const flip = isFlipCard(card)
   const frame = chooseFrame(card)
   const pt = ptOf(card)
   const watermark = basicWatermarkOf(card)
@@ -341,18 +429,21 @@ export function cardToDesign(
     ...(watermark ? { basicWatermark: watermark } : {}),
     text: {
       name: card.name.split(' // ')[0] ?? card.name,
-      // Una Adventure/Split real es de doble cara: igual que Battle, el
+      // Una Adventure/Split/Flip real es de doble cara: igual que Battle, el
       // `mana_cost`/`type_line`/`oracle_text` de la raíz junta los de las dos
       // caras («{2}{R} // {1}{R}»), así que hay que quedarse con el de la cara
-      // principal (para Split, `card_faces[0]`; la segunda mitad la crea
-      // aparte `splitPartnerDesignOf`).
+      // principal (para Split y Flip, `card_faces[0]`; la otra mitad/cara la
+      // crea aparte `splitPartnerDesignOf`/`flipPartnerDesignOf`).
       mana:
-        (adventure || split ? face?.mana_cost : undefined) ?? card.mana_cost ?? face?.mana_cost ?? '',
+        (adventure || split || flip ? face?.mana_cost : undefined) ??
+        card.mana_cost ??
+        face?.mana_cost ??
+        '',
       // Una Battle real es de doble cara (`transform`): el `type_line` de la
       // raíz junta las dos («Battle — Siege // Creature — …»), así que aquí
       // hay que quedarse con el de la cara frontal, no con el combinado.
       type:
-        (battle || adventure || split ? face?.type_line : undefined) ??
+        (battle || adventure || split || flip ? face?.type_line : undefined) ??
         card.type_line ??
         face?.type_line ??
         '',
@@ -360,7 +451,7 @@ export function cardToDesign(
       // Scryfall pone como texto de reglas.
       oracle: watermark
         ? ''
-        : ((adventure || split ? face?.oracle_text : undefined) ??
+        : ((adventure || split || flip ? face?.oracle_text : undefined) ??
           card.oracle_text ??
           face?.oracle_text ??
           ''),
@@ -368,7 +459,7 @@ export function cardToDesign(
       // La etiqueta la escribe quien haga el proxy: en blanco por defecto.
       note: '',
       pt,
-      artist: (split ? face?.artist : undefined) ?? card.artist ?? face?.artist ?? '',
+      artist: (split || flip ? face?.artist : undefined) ?? card.artist ?? face?.artist ?? '',
       info: infoLine(card),
     },
     loyalty,
@@ -380,6 +471,8 @@ export function cardToDesign(
     isBackFace: false,
     splitPartnerId: split ? (splitPartnerId ?? null) : null,
     isSplitPartner: false,
+    flipPartnerId: flip ? (flipPartnerId ?? null) : null,
+    isFlipPartner: false,
     adventure,
     createdAt: now,
     updatedAt: now,

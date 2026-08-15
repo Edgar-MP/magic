@@ -34,6 +34,8 @@ const design = (overrides: Partial<ProxyDesign> = {}): ProxyDesign => ({
   isBackFace: false,
   splitPartnerId: null,
   isSplitPartner: false,
+  flipPartnerId: null,
+  isFlipPartner: false,
   adventure: null,
   flags: { legendary: false, nyx: false, stamp: false, showPt: false },
   art: { x: 0, y: 0, scale: 1 },

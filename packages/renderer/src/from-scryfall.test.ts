@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { cardSchema } from '@magic/shared'
-import { cardToDesign, isSplitCard, splitPartnerDesignOf } from './from-scryfall.js'
+import {
+  cardToDesign,
+  flipPartnerDesignOf,
+  isFlipCard,
+  isSplitCard,
+  splitPartnerDesignOf,
+} from './from-scryfall.js'
 
 const teferi = cardSchema.parse({
   id: 'teferi',
@@ -186,6 +192,48 @@ const lifeDeath = cardSchema.parse({
   ],
 })
 
+/**
+ * Flip real (Scryfall): `layout: 'flip'`, `card_faces` con dos cartas
+ * completas e independientes, cada una con su propio `mana_cost`/
+ * `type_line`/`oracle_text`/`power`/`toughness`/nombre. A diferencia de
+ * Adventure/Battle (una cara embebida), y a diferencia de Split (mismos
+ * datos, pero rotadas 90° lado a lado), aquí las dos caras van en `flip.ts`
+ * cada una en su mitad física, la segunda cabeza abajo.
+ */
+const erayo = cardSchema.parse({
+  id: 'erayo',
+  name: "Erayo, Soratami Ascendant // Erayo's Essence",
+  layout: 'flip',
+  mana_cost: '{1}{U}',
+  type_line: 'Legendary Creature — Soratami Monk // Legendary Enchantment',
+  colors: ['U'],
+  color_identity: ['U'],
+  legalities: {},
+  set: 'bok',
+  power: '1',
+  toughness: '1',
+  card_faces: [
+    {
+      name: 'Erayo, Soratami Ascendant',
+      mana_cost: '{1}{U}',
+      type_line: 'Legendary Creature — Soratami Monk',
+      colors: ['U'],
+      power: '1',
+      toughness: '1',
+      oracle_text:
+        'Flying\n' +
+        "As long as an opponent has cast two or more spells this turn, flip Erayo, Soratami Ascendant.",
+    },
+    {
+      name: "Erayo's Essence",
+      type_line: 'Legendary Enchantment',
+      colors: ['U'],
+      oracle_text:
+        "Whenever a player casts a spell, if it's the third spell cast this turn, counter that spell.",
+    },
+  ],
+})
+
 describe('cardToDesign', () => {
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
@@ -302,6 +350,29 @@ describe('cardToDesign', () => {
       'As an additional cost to cast this spell, sacrifice a creature or discard a card.\n' +
         'Target creature gets -1/-1 until end of turn.',
     )
+  })
+
+  it('detecta una Flip y crea la primera cara con la criatura', () => {
+    expect(isFlipCard(erayo)).toBe(true)
+    const design = cardToDesign(erayo, { id: 'x', now: 0, flipPartnerId: 'y' })
+    expect(design.layout).toBe('card')
+    expect(design.text.name).toBe('Erayo, Soratami Ascendant')
+    expect(design.text.mana).toBe('{1}{U}')
+    expect(design.text.type).toBe('Legendary Creature — Soratami Monk')
+    expect(design.text.pt).toBe('1/1')
+    expect(design.flipPartnerId).toBe('y')
+    expect(design.isFlipPartner).toBe(false)
+  })
+
+  it('crea la segunda cara de una Flip ya vinculada a la primera', () => {
+    const partner = flipPartnerDesignOf(erayo, { id: 'y', now: 0, firstId: 'x' })
+    expect(partner?.layout).toBe('card')
+    expect(partner?.text.name).toBe("Erayo's Essence")
+    expect(partner?.text.mana).toBe('')
+    expect(partner?.text.type).toBe('Legendary Enchantment')
+    expect(partner?.text.pt).toBe('')
+    expect(partner?.flipPartnerId).toBe('x')
+    expect(partner?.isFlipPartner).toBe(true)
   })
 
   it('una carta normal no lleva capa de planeswalker', () => {

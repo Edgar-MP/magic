@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { db, scryfall } from '@magic/cards'
-import { cardToDesign, isSplitCard, splitPartnerDesignOf } from '@magic/renderer'
+import {
+  cardToDesign,
+  flipPartnerDesignOf,
+  isFlipCard,
+  isSplitCard,
+  splitPartnerDesignOf,
+} from '@magic/renderer'
 import { proxyFileSchema, type ProxyDesign } from '@magic/shared'
 import { CardSearch } from '../components/CardSearch.js'
 import { CardPreview } from '../components/CardPreview.js'
@@ -22,14 +28,26 @@ export function Proxies() {
     const now = Date.now()
     // Split (Fire // Ice): dos hechizos completos, cada uno su propio proxy,
     // enlazados por `splitPartnerId` — se crean y guardan los dos a la vez.
-    const partnerId = isSplitCard(card) ? newId() : undefined
-    const design = cardToDesign(card, { id: newId(), now, splitPartnerId: partnerId })
+    const splitId = isSplitCard(card) ? newId() : undefined
+    // Flip (Erayo, Soratami Ascendant // Erayo's Essence): igual patrón, con
+    // `flipPartnerId`.
+    const flipId = isFlipCard(card) ? newId() : undefined
+    const design = cardToDesign(card, {
+      id: newId(),
+      now,
+      splitPartnerId: splitId,
+      flipPartnerId: flipId,
+    })
     // El símbolo de expansión hay que pedirlo aparte: no viene en la carta.
     const icon = await scryfall.setIcon(card.set).catch(() => undefined)
     if (icon) design.setSymbol = icon
 
-    if (partnerId) {
-      const partner = splitPartnerDesignOf(card, { id: partnerId, now, firstId: design.id })
+    if (splitId) {
+      const partner = splitPartnerDesignOf(card, { id: splitId, now, firstId: design.id })
+      if (partner) await db.proxies.bulkAdd([design, partner])
+      else await db.proxies.add(design)
+    } else if (flipId) {
+      const partner = flipPartnerDesignOf(card, { id: flipId, now, firstId: design.id })
       if (partner) await db.proxies.bulkAdd([design, partner])
       else await db.proxies.add(design)
     } else {
@@ -69,6 +87,8 @@ export function Proxies() {
       isBackFace: false,
       splitPartnerId: null,
       isSplitPartner: false,
+      flipPartnerId: null,
+      isFlipPartner: false,
       adventure: null,
       createdAt: now,
       updatedAt: now,
@@ -174,6 +194,15 @@ export function Proxies() {
                   style={design.backFaceId ? { top: '1.75rem' } : undefined}
                 >
                   ⇄ split
+                </span>
+              )}
+              {design.flipPartnerId && (
+                <span
+                  title="Flip: tiene otra cara"
+                  className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
+                  style={design.backFaceId ? { top: '1.75rem' } : undefined}
+                >
+                  ⤒ flip
                 </span>
               )}
             </Link>

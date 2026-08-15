@@ -1,6 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
   createBackFace as createBackFaceDb,
+  createFlipPartner as createFlipPartnerDb,
   createSplitPartner as createSplitPartnerDb,
   db,
   getCards,
@@ -11,6 +12,7 @@ import {
   listProxies,
   loadCards,
   removeBackFace as removeBackFaceDb,
+  removeFlipPartner as removeFlipPartnerDb,
   removeSplitPartner as removeSplitPartnerDb,
   softDeleteCollectionItem,
   softDeleteDeck,
@@ -86,6 +88,17 @@ export async function createSplitPartner(firstId: string): Promise<string> {
 /** Quita la otra mitad de una Split: la borra y desvincula la primera. */
 export async function removeSplitPartner(firstId: string): Promise<void> {
   await removeSplitPartnerDb(firstId)
+}
+
+/** Crea la otra cara de una Flip y devuelve su id, listo para navegar a editarla. */
+export async function createFlipPartner(firstId: string): Promise<string> {
+  const partner = await createFlipPartnerDb(firstId)
+  return partner.id
+}
+
+/** Quita la otra cara de una Flip: la borra y desvincula la primera. */
+export async function removeFlipPartner(firstId: string): Promise<void> {
+  await removeFlipPartnerDb(firstId)
 }
 
 export function useCollection() {

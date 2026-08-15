@@ -16,7 +16,13 @@ import {
   type DeckEntry,
   type Format,
 } from '@magic/shared'
-import { cardToDesign, isSplitCard, splitPartnerDesignOf } from '@magic/renderer'
+import {
+  cardToDesign,
+  flipPartnerDesignOf,
+  isFlipCard,
+  isSplitCard,
+  splitPartnerDesignOf,
+} from '@magic/renderer'
 import { CardPreview } from '../components/CardPreview.js'
 import { CardSearch } from '../components/CardSearch.js'
 import { CATEGORY_ORDER, Issues, Stats, categoryOf } from '../components/DeckPanels.js'
@@ -102,11 +108,19 @@ export function DeckEditor() {
     }
 
     const now = Date.now()
-    const partnerId = isSplitCard(card) ? newId() : undefined
-    const design = cardToDesign(card, { id: newId(), now, splitPartnerId: partnerId })
-    const partner = partnerId
-      ? splitPartnerDesignOf(card, { id: partnerId, now, firstId: design.id })
-      : null
+    const splitId = isSplitCard(card) ? newId() : undefined
+    const flipId = isFlipCard(card) ? newId() : undefined
+    const design = cardToDesign(card, {
+      id: newId(),
+      now,
+      splitPartnerId: splitId,
+      flipPartnerId: flipId,
+    })
+    const partner = splitId
+      ? splitPartnerDesignOf(card, { id: splitId, now, firstId: design.id })
+      : flipId
+        ? flipPartnerDesignOf(card, { id: flipId, now, firstId: design.id })
+        : null
     if (partner) await db.proxies.bulkAdd([design, partner])
     else await db.proxies.add(design)
     await saveDeck({
