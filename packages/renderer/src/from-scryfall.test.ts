@@ -19,6 +19,22 @@ const teferi = cardSchema.parse({
     '−8: You get an emblem with "Whenever you draw a card, exile target permanent an opponent controls."',
 })
 
+const songOfFreyalise = cardSchema.parse({
+  id: 'song-of-freyalise',
+  name: 'Song of Freyalise',
+  layout: 'saga',
+  mana_cost: '{1}{G}',
+  type_line: 'Enchantment — Saga',
+  colors: ['G'],
+  color_identity: ['G'],
+  legalities: {},
+  set: 'dom',
+  oracle_text:
+    '(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\n' +
+    'I, II — Until your next turn, creatures you control gain "{T}: Add one mana of any color."\n' +
+    'III — Put a +1/+1 counter on each creature you control. Those creatures gain vigilance, trample, and indestructible until end of turn.',
+})
+
 describe('cardToDesign', () => {
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
@@ -33,6 +49,21 @@ describe('cardToDesign', () => {
       {
         cost: '-8',
         text: 'You get an emblem with "Whenever you draw a card, exile target permanent an opponent controls."',
+      },
+    ])
+  })
+
+  it('detecta una saga y saca sus capítulos del oracle', () => {
+    const design = cardToDesign(songOfFreyalise, { id: 'x', now: 0 })
+    expect(design.layout).toBe('saga')
+    expect(design.chapters).toEqual([
+      {
+        chapter: 'I, II',
+        text: 'Until your next turn, creatures you control gain "{T}: Add one mana of any color."',
+      },
+      {
+        chapter: 'III',
+        text: 'Put a +1/+1 counter on each creature you control. Those creatures gain vigilance, trample, and indestructible until end of turn.',
       },
     ])
   })

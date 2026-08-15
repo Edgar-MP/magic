@@ -9,6 +9,7 @@ import {
   type FrameColor,
   type PlaneswalkerAbility,
   type ProxyDesign,
+  type SagaChapter,
   type ProxyFile,
 } from '@magic/shared'
 import { CardPreview } from '../components/CardPreview.js'
@@ -97,6 +98,17 @@ export function ProxyEditor() {
 
   const removeAbility = (index: number) =>
     update({ abilities: draft.abilities.filter((_, i) => i !== index) })
+
+  const setChapter = (index: number, changes: Partial<SagaChapter>) =>
+    update({
+      chapters: draft.chapters.map((c, i) => (i === index ? { ...c, ...changes } : c)),
+    })
+
+  const addChapter = () =>
+    update({ chapters: [...draft.chapters, { chapter: 'I', text: '' }] })
+
+  const removeChapter = (index: number) =>
+    update({ chapters: draft.chapters.filter((_, i) => i !== index) })
 
   /**
    * Marca el proxy como editado: es lo que permite ir por un mazo entero
@@ -263,6 +275,11 @@ export function ProxyEditor() {
               label="Planeswalker (lealtad y habilidades)"
               checked={draft.layout === 'planeswalker'}
               onChange={(v) => update({ layout: v ? 'planeswalker' : 'card' })}
+            />
+            <Toggle
+              label="Saga (capítulos numerados)"
+              checked={draft.layout === 'saga'}
+              onChange={(v) => update({ layout: v ? 'saga' : 'card' })}
             />
 
             {draft.layout === 'card' && (
@@ -439,6 +456,45 @@ export function ProxyEditor() {
                 className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
               >
                 Añadir habilidad
+              </button>
+            </Section>
+          )}
+
+          {draft.layout === 'saga' && (
+            <Section title="Capítulos">
+              <div className="flex flex-col gap-2">
+                {draft.chapters.map((chapter, i) => (
+                  <div key={i} className="flex gap-2 rounded border border-edge bg-ink p-2">
+                    <input
+                      value={chapter.chapter}
+                      onChange={(e) => setChapter(i, { chapter: e.target.value })}
+                      placeholder="I"
+                      className="h-fit w-14 shrink-0 rounded border border-edge bg-panel px-2 py-1 text-center text-sm outline-none focus:border-accent"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <RichTextField
+                        value={chapter.text}
+                        onChange={(v) => setChapter(i, { text: v })}
+                        compact
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeChapter(i)}
+                      className="h-fit shrink-0 rounded border border-edge px-2 py-1 text-xs text-muted hover:border-red-500 hover:text-red-400"
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addChapter}
+                className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+              >
+                Añadir capítulo
               </button>
             </Section>
           )}

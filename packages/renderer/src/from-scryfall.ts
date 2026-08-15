@@ -1,4 +1,4 @@
-import type { Card, Color, FrameColor, PlaneswalkerAbility, ProxyDesign } from '@magic/shared'
+import type { Card, Color, FrameColor, PlaneswalkerAbility, ProxyDesign, SagaChapter } from '@magic/shared'
 import { hasType, isBasicLand, isLegendary } from '@magic/shared'
 
 /**
@@ -109,6 +109,26 @@ function planeswalkerAbilitiesOf(card: Card): PlaneswalkerAbility[] {
   return abilities
 }
 
+/**
+ * El oracle de una saga es un capítulo por línea, con su número (o rango de
+ * números, cuando varios capítulos comparten efecto: `I, II — …`) delante de
+ * una raya larga (`—`, em dash, no un guion normal).
+ */
+const CHAPTER_LINE = /^([IVX]+(?:\s*,\s*[IVX]+)*)\s*—\s*(.+)$/su
+
+function sagaChaptersOf(card: Card): SagaChapter[] {
+  const oracle = card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? ''
+  const chapters: SagaChapter[] = []
+
+  for (const line of oracle.split('\n')) {
+    const match = CHAPTER_LINE.exec(line.trim())
+    if (match?.[1] && match[2]) {
+      chapters.push({ chapter: match[1].replace(/\s*,\s*/g, ', '), text: match[2] })
+    }
+  }
+  return chapters
+}
+
 /** Línea inferior: `M10 · 146 · ES`, como la de las cartas reales. */
 function infoLine(card: Card): string {
   return [card.set.toUpperCase(), card.collector_number, card.rarity?.[0]?.toUpperCase()]
@@ -134,6 +154,8 @@ export function cardToDesign(
   const planeswalker = hasType(card, 'Planeswalker')
   const abilities = planeswalker ? planeswalkerAbilitiesOf(card) : []
   const loyalty = card.loyalty ?? face?.loyalty ?? ''
+  const saga = card.layout === 'saga' || hasType(card, 'Saga')
+  const chapters = saga ? sagaChaptersOf(card) : []
 
   const artUrl = useOfficialArt
     ? (card.image_uris?.art_crop ?? face?.image_uris?.art_crop)
@@ -142,7 +164,7 @@ export function cardToDesign(
   return {
     id,
     sourceCardId: card.id,
-    layout: planeswalker ? 'planeswalker' : 'card',
+    layout: planeswalker ? 'planeswalker' : saga ? 'saga' : 'card',
     frameSet: 'm15',
     variant: 'regular',
     edited: false,
@@ -179,6 +201,7 @@ export function cardToDesign(
     },
     loyalty,
     abilities,
+    chapters,
     createdAt: now,
     updatedAt: now,
   }

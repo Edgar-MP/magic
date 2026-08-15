@@ -7,6 +7,7 @@ import {
   FRAME_SETS,
   M15,
   PLANESWALKER,
+  SAGA,
   VARIANTS,
   artBoxOf,
   landSymbolPath,
@@ -64,6 +65,7 @@ export async function renderCardLayers(
   { width = PREVIEW_WIDTH }: { width?: number } = {},
 ): Promise<CardLayers> {
   if (design.layout === 'planeswalker') return renderPlaneswalkerLayers(design, env, { width })
+  if (design.layout === 'saga') return renderSagaLayers(design, env, { width })
 
   const set = FRAME_SETS[design.frameSet] ?? M15
   const variant = VARIANTS[design.variant] ?? VARIANTS.regular
@@ -328,6 +330,176 @@ async function drawPlaneswalkerBadges(
     ctx.scale(scaleX, 1)
     ctx.fillText(ability.cost, 0, 0)
     ctx.restore()
+    ctx.restore()
+  }
+}
+
+/**
+ * Plantilla de saga: pergamino con el arte a la derecha en vez de arriba, y
+ * una cinta dorada vertical a la izquierda del texto con el número romano de
+ * cada capítulo en una insignia hexagonal.
+ */
+async function renderSagaLayers(
+  design: ProxyDesign,
+  env: RenderEnv,
+  { width = PREVIEW_WIDTH }: { width?: number } = {},
+): Promise<CardLayers> {
+  const height = Math.round(width / SAGA.aspect)
+
+  await env.ensureFonts(['title', 'titleSmallCaps', 'body', 'bodyItalic'])
+
+  const overlay = env.createSurface(width, height)
+  const { ctx } = overlay
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  const scale = { width, height }
+
+  const frame = await env.loadAsset(paths.sagaFrame(design.frameColor)).catch(() => undefined)
+  if (frame) ctx.drawImage(frame, 0, 0, scale.width, scale.height)
+
+  const symbolWidthPx = await drawSagaSetSymbol(ctx, env, design, scale)
+  drawOneLine(ctx, design.text.name, SAGA.title, scale, {
+    maxWidth: reservedTitleWidth(design, SAGA.title, SAGA.mana, scale),
+  })
+  await drawManaCost(ctx, env, design, SAGA.mana, scale)
+  drawOneLine(ctx, design.text.type, SAGA.type, scale, {
+    maxWidth: SAGA.type.width * scale.width - symbolWidthPx,
+  })
+  drawNote(ctx, design.text.note, SAGA.note, scale, FRAME_ACCENT[design.frameColor])
+  await drawSagaChapters(ctx, env, design, scale)
+  drawInfoLine(ctx, design, SAGA.info, scale)
+
+  return { overlay, artBox: SAGA.art, width, height }
+}
+
+async function drawSagaSetSymbol(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<number> {
+  if (!design.setSymbol) return 0
+  const symbol = await env.loadImage(design.setSymbol).catch(() => undefined)
+  if (!symbol) return 0
+
+  const box = px(SAGA.setSymbol, scale)
+  const height = box.height
+  const width = height * (symbol.width / symbol.height)
+  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
+  return Math.max(0, SAGA.type.width * scale.width - (box.x - width - SAGA.type.x * scale.width))
+}
+
+/**
+ * Filas de capítulos repartidas a partes iguales dentro de la cinta, igual
+ * que `planeswalkerRows` reparte las habilidades de lealtad.
+ */
+function sagaRows(design: ProxyDesign, scale: Scale): { y: number; height: number }[] {
+  const box = px(SAGA.chapters, scale)
+  const count = Math.max(1, design.chapters.length)
+  const rowHeight = box.height / count
+  return design.chapters.map((_, i) => ({ y: box.y + i * rowHeight, height: rowHeight }))
+}
+
+async function drawSagaChapters(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  if (design.chapters.length === 0) return
+
+  const box = px(SAGA.chapters, scale)
+  const badgeBox = px({ x: SAGA.chapterBadge.x, y: SAGA.chapters.y, width: SAGA.chapterBadge.width, height: SAGA.chapters.height }, scale)
+  const textBox = px({ x: SAGA.chapterText.x, y: SAGA.chapters.y, width: SAGA.chapterText.width, height: SAGA.chapters.height }, scale)
+  const rows = sagaRows(design, scale)
+  const badge = await env.loadAsset(paths.sagaChapterBadge()).catch(() => undefined)
+
+  // El texto no puede salirse de la caja de capítulos pase lo que pase.
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(textBox.x, box.y, textBox.width, box.height)
+  ctx.clip()
+
+  const nominal = scale.height * 0.0262
+
+  for (const [i, chapter] of design.chapters.entries()) {
+    const row = rows[i]
+    if (!row) continue
+
+    const rowBox: TextBox = {
+      x: SAGA.chapterText.x,
+      y: row.y / scale.height,
+      width: SAGA.chapterText.width,
+      height: row.height / scale.height,
+      size: nominal / scale.height,
+      font: 'body',
+    }
+    const rowPx = px(rowBox, scale)
+
+    const tokens = tokenize(chapter.text)
+    const measureText = (text: string, fontSize: number, italic: boolean) => {
+      ctx.font = fontString(rowBox, fontSize, italic)
+      return ctx.measureText(text).width
+    }
+    const layout = layoutAutofit(tokens, {
+      width: rowPx.width,
+      height: rowPx.height,
+      fontSize: nominal,
+      minFontSize: nominal * 0.3,
+      measureText,
+    })
+
+    let y = rowPx.y + Math.max(0, (rowPx.height - layout.height) / 2)
+    for (const line of layout.lines) {
+      y += line.spaceBefore
+      if (!line.divider) await drawLine(ctx, env, line, rowBox, layout.fontSize, rowPx.x, y)
+      y += layout.lineHeight
+    }
+  }
+  ctx.restore()
+
+  // Separadores finos entre capítulos, como el borde inferior de cada fila.
+  ctx.save()
+  ctx.strokeStyle = 'rgba(120,95,40,0.35)'
+  ctx.lineWidth = Math.max(1, scale.height * 0.0012)
+  for (const row of rows.slice(1)) {
+    ctx.beginPath()
+    ctx.moveTo(textBox.x, row.y)
+    ctx.lineTo(textBox.x + textBox.width, row.y)
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  if (!badge) return
+  for (const [i, chapter] of design.chapters.entries()) {
+    const row = rows[i]
+    if (!row) continue
+
+    // La insignia tiene que caber en el ancho real de la cinta dorada: si se
+    // dimensiona sólo por alto (como en planeswalker), en cintas estrechas se
+    // sale por encima del texto de al lado.
+    const badgeWidth = Math.min(badgeBox.width * 0.94, row.height * 0.82 * (badge.width / badge.height))
+    const badgeHeight = badgeWidth * (badge.height / badge.width)
+    const badgeX = badgeBox.x + badgeBox.width / 2 - badgeWidth / 2
+    const badgeY = row.y + row.height / 2 - badgeHeight / 2
+    ctx.drawImage(badge, badgeX, badgeY, badgeWidth, badgeHeight)
+
+    ctx.save()
+    const nominal = badgeHeight * 0.4
+    ctx.font = `${nominal}px "${FONT_FAMILY.titleSmallCaps}"`
+    const { scaleX, fontSize } = condenseToWidth(
+      ctx.measureText(chapter.chapter).width,
+      badgeWidth * 0.72,
+      nominal,
+    )
+    if (fontSize !== nominal) ctx.font = `${fontSize}px "${FONT_FAMILY.titleSmallCaps}"`
+    ctx.fillStyle = '#3a2c0f'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'alphabetic'
+    ctx.translate(badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + nominal * 0.34)
+    ctx.scale(scaleX, 1)
+    ctx.fillText(chapter.chapter, 0, 0)
     ctx.restore()
   }
 }

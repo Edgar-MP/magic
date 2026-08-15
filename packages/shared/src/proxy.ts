@@ -101,11 +101,23 @@ export const planeswalkerAbilitySchema = z.object({
 export type PlaneswalkerAbility = z.infer<typeof planeswalkerAbilitySchema>
 
 /**
- * `card` es la plantilla normal (criatura/hechizo/tierra…); `planeswalker`
- * cambia a la caja de habilidades con coste de lealtad. No hay más plantillas
- * especiales todavía (saga, class, battle…), pero el campo ya deja sitio.
+ * Un capítulo de saga: `chapter` lleva el numeral romano tal cual aparece en
+ * la carta real («I», «II», o rangos compartidos como «I, II»), y `text` el
+ * efecto de ese capítulo.
  */
-export const CARD_LAYOUTS = ['card', 'planeswalker'] as const
+export const sagaChapterSchema = z.object({
+  chapter: z.string().default('I'),
+  text: z.string().default(''),
+})
+export type SagaChapter = z.infer<typeof sagaChapterSchema>
+
+/**
+ * `card` es la plantilla normal (criatura/hechizo/tierra…); `planeswalker`
+ * cambia a la caja de habilidades con coste de lealtad; `saga` cambia a la
+ * franja lateral con capítulos numerados. No hay más plantillas especiales
+ * todavía (class, battle…), pero el campo ya deja sitio.
+ */
+export const CARD_LAYOUTS = ['card', 'planeswalker', 'saga'] as const
 export type CardLayout = (typeof CARD_LAYOUTS)[number]
 
 export const proxyDesignSchema = z.object({
@@ -147,6 +159,8 @@ export const proxyDesignSchema = z.object({
   loyalty: z.string().default(''),
   /** Sólo si `layout` es `planeswalker`: sus habilidades, de arriba a abajo. */
   abilities: z.array(planeswalkerAbilitySchema).default([]),
+  /** Sólo si `layout` es `saga`: sus capítulos, de arriba a abajo. */
+  chapters: z.array(sagaChapterSchema).default([]),
   /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.

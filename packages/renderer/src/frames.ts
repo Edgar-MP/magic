@@ -286,6 +286,98 @@ export const PLANESWALKER = {
   },
 }
 
+/**
+ * Geometría del marco de saga: es un pergamino con el arte a la derecha (no
+ * arriba) y una cinta dorada vertical a la izquierda del texto donde van los
+ * números romanos de cada capítulo. Como con planeswalker, no hay que fiarse
+ * de las coordenadas de CardConjurer (su versión de este marco usa un sistema
+ * de capas genérico sin cajas de texto fijas, no las coordenadas simples de
+ * `m15Planeswalker/regular.js`): todo lo de abajo se midió a ojo píxel a
+ * píxel sobre `saga/sagaFrameW.png` (1500×2100) con getImageData, buscando
+ * las transiciones de color/alfa reales entre marco, texto y arte.
+ */
+export const SAGA = {
+  aspect: 1500 / 2100,
+  // El arte ocupa la mitad derecha, de textura transparente en el PNG del
+  // marco: medido buscando dónde el alfa cae a 0 (fila y=0.5, columna x=0.7).
+  art: { x: 0.5015, y: 0.113, width: 0.422, height: 0.7245 },
+  setSymbol: { x: 0.9213, y: 0.591, width: 0.12, height: 0.041, align: 'right' as const },
+  // La banda del título ocupa casi todo el ancho de la carta (no sólo la
+  // mitad del texto), igual que en el marco normal: medido en la fila
+  // y=0.06, donde el pergamino claro va de x=0.072 a x=0.934.
+  title: {
+    x: 0.075,
+    y: 0.067 - 0.0543 / 2,
+    width: 0.855,
+    height: 0.0543,
+    size: 0.0381,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  mana: {
+    x: 0.075,
+    y: 0.067 - 0.0543 / 2,
+    width: 0.855,
+    height: 0.0543,
+    size: 0.0338,
+    font: 'title' as const,
+    align: 'right' as const,
+    oneLine: true,
+  },
+  // Banda del tipo, al pie: medida en la columna x=0.5, donde el pergamino
+  // claro va de y=0.845 a y=0.900.
+  type: {
+    x: 0.075,
+    y: 0.8725 - 0.0543 / 2,
+    width: 0.855,
+    height: 0.0543,
+    size: 0.0324,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /**
+   * Caja completa de capítulos: la cinta con los números (izquierda) más el
+   * texto (derecha). Arranca por debajo de la esquina doblada decorativa de
+   * la cinta (el degradado marrón que hay entre y=0.115 y y=0.28) y acaba
+   * antes de que la cinta se estreche en punta (hacia y=0.81), para no cortar
+   * el último renglón con la punta dorada.
+   */
+  chapters: { x: 0.045, y: 0.29, width: 0.5015 - 0.045, height: 0.51 },
+  /**
+   * Sub-caja de la cinta con el número romano, dentro de `chapters`. El ancho
+   * es el de la cinta dorada real (medido en la fila y=0.5: el filo dorado de
+   * fuera va de x=0.045 a x=0.108): la insignia tiene que caber ahí, no en el
+   * ancho que le dé la gana, o invade el texto de al lado.
+   */
+  chapterBadge: { x: 0.045, width: 0.108 - 0.045 },
+  /** Sub-caja del texto de cada capítulo, a la derecha de la cinta. */
+  chapterText: { x: 0.111, width: 0.5015 - 0.111 },
+  /** Etiqueta bajo el nombre: mismo hueco que en el marco normal, sobre el arte. */
+  note: {
+    x: 0.075,
+    y: 0.104,
+    width: 0.855,
+    height: 0.0295,
+    size: 0.0207,
+    font: 'body' as const,
+    align: 'center' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /** Artista e info: calcado del marco normal, pegado al filo inferior. */
+  info: {
+    x: 0.0854,
+    y: 0.9476,
+    width: 0.8292,
+    height: 0.022,
+    size: 0.0186,
+    font: 'body' as const,
+    color: '#ffffff',
+  },
+}
+
 /** Nombre de familia con el que se registra cada tipografía en el canvas. */
 export const FONT_FAMILY: Record<FontRole, string> = {
   title: 'belerenb',
@@ -535,6 +627,23 @@ export const paths = {
   planeswalkerPip(sign: 'plus' | 'minus' | 'neutral'): string {
     const file = { plus: 'planeswalkerPlus', minus: 'planeswalkerMinus', neutral: 'planeswalkerNeutral' }
     return `planeswalker/${file[sign]}.png`
+  },
+
+  /**
+   * El marco de saga sólo existe en cinco colores (sin tierra, artefacto ni
+   * vehículo propios): el oro hace de comodín para todo lo que no sea uno de
+   * los cinco colores básicos.
+   */
+  sagaFrame(color: FrameColor): string {
+    const base = isLandFrame(color) ? color.replace(/Land$/, '') : color
+    const five = ['white', 'blue', 'black', 'red', 'green']
+    const actual = (five.includes(base) ? base : 'gold') as FrameColor
+    return `saga/sagaFrame${LETTER[actual].toUpperCase()}.png`
+  },
+
+  /** Insignia hexagonal dorada donde va el número romano de cada capítulo. */
+  sagaChapterBadge(): string {
+    return 'saga/sagaChapter.png'
   },
 
   /** Reverso clásico de Magic. */

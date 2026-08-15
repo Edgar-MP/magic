@@ -27,6 +27,7 @@ const design = (overrides: Partial<ProxyDesign> = {}): ProxyDesign => ({
   frameColor: 'red',
   loyalty: '',
   abilities: [],
+  chapters: [],
   flags: { legendary: false, nyx: false, stamp: false, showPt: false },
   art: { x: 0, y: 0, scale: 1 },
   text: {

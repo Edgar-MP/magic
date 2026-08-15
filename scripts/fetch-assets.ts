@@ -129,6 +129,13 @@ function manifest(): [string, string][] {
     ])
   }
 
+  // Saga: marco por color (sólo cinco, sin oro/artefacto propios: usa
+  // Multicolored como comodín) y la insignia de capítulo que va en la franja.
+  for (const c of ['W', 'U', 'B', 'R', 'G', 'M']) {
+    files.push([`data/images/cardImages/saga/sagaFrame${c}.png`, `saga/sagaFrame${c}.png`])
+  }
+  files.push(['data/images/cardImages/saga/sagaChapter.png', 'saga/sagaChapter.png'])
+
   // Tipografías: Beleren para títulos y tipos, MPlantin para el texto de reglas.
   for (const font of [
     'beleren-b.ttf',

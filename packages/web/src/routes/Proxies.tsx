@@ -50,6 +50,7 @@ export function Proxies() {
       },
       loyalty: '',
       abilities: [],
+      chapters: [],
       createdAt: now,
       updatedAt: now,
     }
