@@ -323,7 +323,7 @@ async function drawPlaneswalkerBadges(
     // cabe el número) queda arriba en vez de abajo. Con el mismo desplazamiento
     // hacia abajo que a la de "más", el número se salía por la punta inferior.
     const textX = badgeX + badgeWidth / 2
-    const textY = row.y + row.height / 2 + badgeHeight * (sign === 'minus' ? -0.14 : 0.18)
+    const textY = row.y + row.height / 2 + badgeHeight * (sign === 'minus' ? 0.03 : 0.18)
     ctx.translate(textX, textY)
     ctx.scale(scaleX, 1)
     ctx.fillText(ability.cost, 0, 0)
