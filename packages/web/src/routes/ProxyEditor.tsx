@@ -17,7 +17,7 @@ import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
 import { RichTextField } from '../components/RichTextField.js'
 import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
-import { deleteProxy, newId, useProxy } from '../lib/db-hooks.js'
+import { createBackFace, deleteProxy, newId, removeBackFace, useProxy } from '../lib/db-hooks.js'
 import { useConfirmLeave } from '../lib/use-confirm-leave.js'
 
 type BasicSymbol = NonNullable<ProxyDesign['basicWatermark']>
@@ -125,6 +125,29 @@ export function ProxyEditor() {
     await db.blobs.put({ id: blobId, blob: file, mime: file.type, createdAt: Date.now() })
     // El encuadre se reinicia: la foto nueva no tiene nada que ver con la anterior.
     update({ art: { blobId, x: 0, y: 0, scale: 1 } })
+  }
+
+  /**
+   * Añade o quita el dorso ya escriben directamente en Dexie (no pasan por el
+   * borrador ni por «Guardar»), así que el cambio se refleja en el borrador a
+   * mano y sin marcarlo `dirty`: no hay nada pendiente de guardar por esto.
+   */
+  const addBackFace = async () => {
+    setStatus('Creando el dorso…')
+    try {
+      const backId = await createBackFace(draft.id)
+      setDraft((current) => (current ? { ...current, backFaceId: backId } : current))
+      setStatus(null)
+      navigate(`/proxies/${backId}`)
+    } catch (error) {
+      setStatus(`Error: ${(error as Error).message}`)
+    }
+  }
+
+  const removeBack = async () => {
+    if (!confirm('¿Quitar y borrar el dorso de esta carta?')) return
+    await removeBackFace(draft.id)
+    setDraft((current) => (current ? { ...current, backFaceId: null } : current))
   }
 
   const exportJson = async () => {
@@ -419,6 +442,52 @@ export function ProxyEditor() {
               />
             </div>
           </Section>
+
+          {!draft.isBackFace && (
+            <Section title="Reverso">
+              {draft.backFaceId ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-muted">Esta carta tiene dorso (doble cara).</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/proxies/${draft.backFaceId}`)}
+                    className="rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+                  >
+                    Editar dorso
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeBack()}
+                    className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-red-500 hover:text-red-400"
+                  >
+                    Quitar dorso
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted">
+                    Cartas de doble cara (Transform): crea el dorso como un proxy aparte,
+                    vinculado a este, con cualquier plantilla propia.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void addBackFace()}
+                    className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+                  >
+                    Añadir dorso
+                  </button>
+                </div>
+              )}
+            </Section>
+          )}
+
+          {draft.isBackFace && (
+            <Section title="Reverso">
+              <p className="text-sm text-muted">
+                Esta carta ES el dorso de otra. Se gestiona desde el editor del frente.
+              </p>
+            </Section>
+          )}
 
           {draft.layout === 'planeswalker' && (
             <Section title="Lealtad">

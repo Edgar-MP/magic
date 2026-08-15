@@ -52,6 +52,8 @@ export function Proxies() {
       abilities: [],
       chapters: [],
       defense: '',
+      backFaceId: null,
+      isBackFace: false,
       createdAt: now,
       updatedAt: now,
     }
@@ -139,8 +141,16 @@ export function Proxies() {
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
         {proxies?.map((design) => (
           <li key={design.id} className="flex flex-col gap-2">
-            <Link to={`/proxies/${design.id}`} className="block">
+            <Link to={`/proxies/${design.id}`} className="relative block">
               <CardPreview design={design} width={320} />
+              {design.backFaceId && (
+                <span
+                  title="Doble cara: tiene dorso"
+                  className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
+                >
+                  ⟲ dorso
+                </span>
+              )}
             </Link>
             <div className="flex items-center justify-between gap-2 text-xs">
               <label className="flex min-w-0 items-center gap-1.5">

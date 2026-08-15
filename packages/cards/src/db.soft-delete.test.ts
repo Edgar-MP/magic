@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { Deck, ProxyDesign } from '@magic/shared'
 import {
+  createBackFace,
   db,
   getDeck,
   getProxy,
@@ -9,6 +10,7 @@ import {
   listCollection,
   listDecks,
   listProxies,
+  removeBackFace,
   softDeleteCollectionItem,
   softDeleteDeck,
   softDeleteProxy,
@@ -94,6 +96,59 @@ describe('proxies', () => {
     await softDeleteProxy(id)
     expect(await listProxies()).toHaveLength(0)
     expect(await getProxy(id)).toBeUndefined()
+  })
+})
+
+describe('doble cara (DFC)', () => {
+  it('crea el dorso vinculado y lo excluye de listProxies', async () => {
+    const frontId = '44444444-4444-4444-8444-444444444444'
+    await db.proxies.add(proxy(frontId))
+
+    const back = await createBackFace(frontId)
+    expect(back.isBackFace).toBe(true)
+
+    const front = await getProxy(frontId)
+    expect(front?.backFaceId).toBe(back.id)
+
+    // El dorso no debe aparecer como un proxy suelto en el listado normal.
+    const listed = await listProxies()
+    expect(listed.map((p) => p.id)).toEqual([frontId])
+  })
+
+  it('borrar el frente borra también el dorso', async () => {
+    const frontId = '55555555-5555-4555-8555-555555555555'
+    await db.proxies.add(proxy(frontId))
+    const back = await createBackFace(frontId)
+
+    await softDeleteProxy(frontId)
+
+    expect(await getProxy(frontId)).toBeUndefined()
+    expect(await getProxy(back.id)).toBeUndefined()
+    const raw = await db.proxies.get(back.id)
+    expect(raw?.deletedAt).toBeGreaterThan(0)
+  })
+
+  it('borrar el dorso limpia el backFaceId del frente', async () => {
+    const frontId = '66666666-6666-4666-8666-666666666666'
+    await db.proxies.add(proxy(frontId))
+    const back = await createBackFace(frontId)
+
+    await softDeleteProxy(back.id)
+
+    const front = await getProxy(frontId)
+    expect(front?.backFaceId).toBeNull()
+  })
+
+  it('removeBackFace borra el dorso y desvincula el frente', async () => {
+    const frontId = '77777777-7777-4777-8777-777777777777'
+    await db.proxies.add(proxy(frontId))
+    const back = await createBackFace(frontId)
+
+    await removeBackFace(frontId)
+
+    expect(await getProxy(back.id)).toBeUndefined()
+    const front = await getProxy(frontId)
+    expect(front?.backFaceId).toBeNull()
   })
 })
 

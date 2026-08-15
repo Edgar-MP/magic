@@ -100,6 +100,15 @@ export async function renderDeckForPrint(
 
       if (design) {
         result.cards.push({ bytes: await renderProxyToPng(design), type: 'png', qty: entry.qty })
+
+        // Doble cara: el dorso va justo detrás en la rejilla de impresión,
+        // como una carta más (mismas copias que el frente).
+        if (design.backFaceId) {
+          const back = await getProxy(design.backFaceId)
+          if (back) {
+            result.cards.push({ bytes: await renderProxyToPng(back), type: 'png', qty: entry.qty })
+          }
+        }
       } else if (card) {
         const { bytes, type } = await fetchOfficial(card)
         result.cards.push({ bytes, type, qty: entry.qty })

@@ -55,4 +55,10 @@ describe('normalizeProxy', () => {
     expect(fixed.text.note).toBe('')
     expect(fixed.variant).toBe('regular')
   })
+
+  it('rellena backFaceId e isBackFace en un proxy sin doble cara', () => {
+    const fixed = normalizeProxy(legacy)
+    expect(fixed.backFaceId).toBeNull()
+    expect(fixed.isBackFace).toBe(false)
+  })
 })

@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import {
+  createBackFace as createBackFaceDb,
   db,
   getCards,
   getDeck,
@@ -8,6 +9,7 @@ import {
   listDecks,
   listProxies,
   loadCards,
+  removeBackFace as removeBackFaceDb,
   softDeleteCollectionItem,
   softDeleteDeck,
   softDeleteProxy,
@@ -60,6 +62,17 @@ export function useProxy(id: string | undefined): StoredProxy | undefined {
 
 export async function deleteProxy(id: string): Promise<void> {
   await softDeleteProxy(id)
+}
+
+/** Crea el dorso de un proxy y devuelve su id, listo para navegar a editarlo. */
+export async function createBackFace(frontId: string): Promise<string> {
+  const back = await createBackFaceDb(frontId)
+  return back.id
+}
+
+/** Quita el dorso de un proxy: lo borra y desvincula el frente. */
+export async function removeBackFace(frontId: string): Promise<void> {
+  await removeBackFaceDb(frontId)
 }
 
 export function useCollection() {

@@ -166,6 +166,20 @@ export const proxyDesignSchema = z.object({
   /** Sólo si `layout` es `battle`: sus casillas de defensa iniciales. */
   defense: z.string().default(''),
   /**
+   * Doble cara (Transform/DFC): si no es `null`, el `id` de OTRO proxy de la
+   * misma colección que es el dorso de este. El dorso es un `ProxyDesign`
+   * completo, con el `layout` que le toque (normal, planeswalker…) — no hay un
+   * layout `'transform'` especial, el par frente/dorso vive un nivel por
+   * encima de eso.
+   */
+  backFaceId: z.string().nullable().default(null),
+  /**
+   * Marca que ESTE proxy es el dorso de otro. Sirve para ocultarlo de los
+   * listados normales de «mis proxies» y no dejar que se edite/borre como si
+   * fuera una carta independiente y suelta.
+   */
+  isBackFace: z.boolean().default(false),
+  /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.
    */

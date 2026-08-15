@@ -211,6 +211,8 @@ export function cardToDesign(
     abilities,
     chapters,
     defense,
+    backFaceId: null,
+    isBackFace: false,
     createdAt: now,
     updatedAt: now,
   }

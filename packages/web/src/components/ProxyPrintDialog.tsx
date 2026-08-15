@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getProxy } from '@magic/cards'
 import type { ProxyDesign } from '@magic/shared'
 import { Modal } from './Modal.js'
 import { BackOptions, NO_BACK, resolveBack, type BackChoice } from './BackOptions.js'
@@ -33,6 +34,16 @@ export function ProxyPrintDialog({
       for (const [index, design] of designs.entries()) {
         setStatus(`Renderizando… ${index + 1}/${designs.length}`)
         cards.push({ bytes: await renderProxyToPng(design), type: 'png' as const, qty: copies })
+
+        // Doble cara: el dorso se imprime justo detrás, como una carta más de
+        // la rejilla (no se resuelve aquí el doblado físico exacto, sólo que
+        // ambas caras salgan y quede claro cuál es cuál).
+        if (design.backFaceId) {
+          const back = await getProxy(design.backFaceId)
+          if (back) {
+            cards.push({ bytes: await renderProxyToPng(back), type: 'png' as const, qty: copies })
+          }
+        }
       }
 
       setStatus('Montando el PDF…')

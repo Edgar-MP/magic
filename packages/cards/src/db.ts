@@ -110,6 +110,18 @@ export class MagicDB extends Dexie {
       meta: 'key',
     })
 
+    // `backFaceId`/`isBackFace` (doble cara) son opcionales con su valor por
+    // defecto: no hace falta ni tocar los índices ni recorrer la tabla, un
+    // proxy antiguo simplemente no tiene dorso.
+    this.version(5).stores({
+      cards: 'id, name, oracle_id, set, cachedAt',
+      decks: 'id, name, format, updatedAt, syncedAt',
+      collection: 'cardId, updatedAt, syncedAt',
+      proxies: 'id, sourceCardId, updatedAt, syncedAt',
+      blobs: 'id, createdAt, syncedAt',
+      meta: 'key',
+    })
+
     // Red de seguridad para lo que no pase por la migración: un fichero .json
     // exportado con una versión antigua, o una pestaña que no se ha recargado.
     this.proxies.hook('reading', (proxy) => normalizeProxy(proxy))
@@ -136,9 +148,14 @@ export async function getDeck(id: string): Promise<StoredDeck | undefined> {
   return deck && isAlive(deck) ? deck : undefined
 }
 
+/**
+ * Proxies «normales», para listados de mis proxies o para elegir cartas de un
+ * mazo. Los dorsos de doble cara no cuentan como proxies sueltos: sólo se
+ * llega a ellos desde su frente.
+ */
 export async function listProxies(): Promise<StoredProxy[]> {
   const proxies = await db.proxies.orderBy('updatedAt').reverse().toArray()
-  return proxies.filter(isAlive)
+  return proxies.filter((p) => isAlive(p) && !p.isBackFace)
 }
 
 export async function getProxy(id: string): Promise<StoredProxy | undefined> {
@@ -160,14 +177,74 @@ export async function softDeleteDeck(id: string): Promise<void> {
   await db.decks.update(id, { deletedAt: now, updatedAt: now })
 }
 
+/**
+ * Borra un proxy y, si es un frente con dorso, borra también el dorso
+ * vinculado; si es un dorso, desvincula el frente que apuntaba a él para que
+ * no se quede con un `backFaceId` colgando de un registro borrado.
+ */
 export async function softDeleteProxy(id: string): Promise<void> {
   const now = Date.now()
+  const proxy = await db.proxies.get(id)
+
   await db.proxies.update(id, { deletedAt: now, updatedAt: now })
+
+  if (proxy?.backFaceId) {
+    await db.proxies.update(proxy.backFaceId, { deletedAt: now, updatedAt: now })
+  }
+
+  if (proxy?.isBackFace) {
+    // No hay índice por `backFaceId` (son pocos y no merece la pena): se busca
+    // a mano el frente que apunta a este dorso.
+    const front = await db.proxies.filter((p) => p.backFaceId === id).first()
+    if (front) await db.proxies.update(front.id, { backFaceId: null, updatedAt: now })
+  }
 }
 
 export async function softDeleteCollectionItem(cardId: string): Promise<void> {
   const now = Date.now()
   await db.collection.update(cardId, { deletedAt: now, updatedAt: now })
+}
+
+/**
+ * Crea el dorso de un proxy existente: un `ProxyDesign` nuevo, en blanco salvo
+ * el color de marco (para que arranque coherente con el frente), marcado
+ * `isBackFace`, y vincula su id en el `backFaceId` del frente. Devuelve el
+ * dorso creado.
+ */
+export async function createBackFace(frontId: string): Promise<StoredProxy> {
+  const front = await getProxy(frontId)
+  if (!front) throw new Error(`No existe el proxy ${frontId}`)
+  if (front.backFaceId) throw new Error('Este proxy ya tiene un dorso')
+
+  const now = Date.now()
+  const base = proxyDesignSchema.parse({
+    id: crypto.randomUUID(),
+    frameColor: front.frameColor,
+    createdAt: now,
+    updatedAt: now,
+  })
+  const back: StoredProxy = {
+    ...base,
+    isBackFace: true,
+    text: { ...base.text, name: front.text.name ? `${front.text.name} (dorso)` : '' },
+  }
+
+  await db.proxies.add(back)
+  await db.proxies.update(frontId, { backFaceId: back.id, updatedAt: now })
+  return back
+}
+
+/**
+ * Quita el dorso de un proxy: lo borra (borrado lógico, igual que cualquier
+ * otro proxy) y limpia el `backFaceId` del frente.
+ */
+export async function removeBackFace(frontId: string): Promise<void> {
+  const front = await getProxy(frontId)
+  if (!front?.backFaceId) return
+
+  const now = Date.now()
+  await db.proxies.update(front.backFaceId, { deletedAt: now, updatedAt: now })
+  await db.proxies.update(frontId, { backFaceId: null, updatedAt: now })
 }
 
 /**
@@ -179,12 +256,21 @@ export function normalizeProxy(proxy: ProxyDesign): ProxyDesign {
   // `get` de un id que no existe), así que aquí llega `undefined`.
   if (proxy == null) return proxy
 
-  if (proxy.variant !== undefined && proxy.edited !== undefined && proxy.text?.note !== undefined) {
+  if (
+    proxy.variant !== undefined &&
+    proxy.edited !== undefined &&
+    proxy.text?.note !== undefined &&
+    proxy.backFaceId !== undefined &&
+    proxy.isBackFace !== undefined
+  ) {
     return proxy
   }
 
   const parsed = proxyDesignSchema.safeParse(proxy)
-  if (parsed.success) return parsed.data
+  // `proxy` puede traer campos que no son del esquema (los de `SyncMeta`,
+  // como `deletedAt`/`syncedAt`): zod los quitaría al parsear, así que se
+  // mezcla sobre el original en vez de sustituirlo entero.
+  if (parsed.success) return { ...proxy, ...parsed.data }
 
   // Ni con los valores por defecto encaja: al menos que no rompa el render.
   return {

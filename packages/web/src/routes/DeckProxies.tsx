@@ -219,8 +219,16 @@ function ProxyCell({
   return (
     <li className="flex flex-col gap-2">
       {design ? (
-        <Link to={`/proxies/${design.id}`} className="block">
+        <Link to={`/proxies/${design.id}`} className="relative block">
           <CardPreview design={design} width={320} />
+          {design.backFaceId && (
+            <span
+              title="Doble cara: tiene dorso"
+              className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
+            >
+              ⟲ dorso
+            </span>
+          )}
         </Link>
       ) : (
         <div className="flex aspect-[63/88] items-center justify-center rounded-xl border border-dashed border-edge px-2 text-center text-xs text-muted">
