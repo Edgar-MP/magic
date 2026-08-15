@@ -168,6 +168,7 @@ export function CardSearch({
   /** Las sugerencias locales sólo traen el id: hay que traerse la carta entera. */
   const pickLocal = async (id: string, name: string) => {
     setFallbackNotice(false)
+    setHover(null)
     if (lang === 'es') {
       const spanish = await scryfall.search(`!"${name}" lang:es`, { unique: 'cards' })
       const match = spanish.cards.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? spanish.cards[0]
@@ -188,6 +189,7 @@ export function CardSearch({
 
   const pickRemote = (card: Card) => {
     setFallbackNotice(false)
+    setHover(null)
     onPick(card)
     setText('')
     setRemoteQuery('')
@@ -254,6 +256,7 @@ export function CardSearch({
                 onClick={() => {
                   onPickProxy?.(proxy)
                   setText('')
+                  setHover(null)
                 }}
                 onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, proxy })}
                 onMouseMove={(e) => setHover({ x: e.clientX, y: e.clientY, proxy })}
