@@ -150,12 +150,12 @@ export async function getDeck(id: string): Promise<StoredDeck | undefined> {
 
 /**
  * Proxies «normales», para listados de mis proxies o para elegir cartas de un
- * mazo. Los dorsos de doble cara no cuentan como proxies sueltos: sólo se
- * llega a ellos desde su frente.
+ * mazo. Los dorsos de doble cara y las mitades de Split no cuentan como
+ * proxies sueltos: sólo se llega a ellos desde su frente/pareja.
  */
 export async function listProxies(): Promise<StoredProxy[]> {
   const proxies = await db.proxies.orderBy('updatedAt').reverse().toArray()
-  return proxies.filter((p) => isAlive(p) && !p.isBackFace)
+  return proxies.filter((p) => isAlive(p) && !p.isBackFace && !p.isSplitPartner)
 }
 
 export async function getProxy(id: string): Promise<StoredProxy | undefined> {
@@ -180,7 +180,10 @@ export async function softDeleteDeck(id: string): Promise<void> {
 /**
  * Borra un proxy y, si es un frente con dorso, borra también el dorso
  * vinculado; si es un dorso, desvincula el frente que apuntaba a él para que
- * no se quede con un `backFaceId` colgando de un registro borrado.
+ * no se quede con un `backFaceId` colgando de un registro borrado. Lo mismo
+ * para `splitPartnerId`/`isSplitPartner`, en paralelo y de forma independiente
+ * (una carta podría en teoría tener dorso Y mitad de Split a la vez, aunque no
+ * se dé en ninguna carta real).
  */
 export async function softDeleteProxy(id: string): Promise<void> {
   const now = Date.now()
@@ -197,6 +200,17 @@ export async function softDeleteProxy(id: string): Promise<void> {
     // a mano el frente que apunta a este dorso.
     const front = await db.proxies.filter((p) => p.backFaceId === id).first()
     if (front) await db.proxies.update(front.id, { backFaceId: null, updatedAt: now })
+  }
+
+  if (proxy?.splitPartnerId) {
+    await db.proxies.update(proxy.splitPartnerId, { deletedAt: now, updatedAt: now })
+  }
+
+  if (proxy?.isSplitPartner) {
+    // Igual que con el dorso: no hay índice por `splitPartnerId`, se busca a
+    // mano la otra mitad que apunta a esta.
+    const partner = await db.proxies.filter((p) => p.splitPartnerId === id).first()
+    if (partner) await db.proxies.update(partner.id, { splitPartnerId: null, updatedAt: now })
   }
 }
 
@@ -248,6 +262,48 @@ export async function removeBackFace(frontId: string): Promise<void> {
 }
 
 /**
+ * Crea la otra mitad de una Split existente: un `ProxyDesign` nuevo, en
+ * blanco salvo el color de marco (igual que `createBackFace`), marcado
+ * `isSplitPartner`, y vincula su id en el `splitPartnerId` de la primera
+ * mitad. Devuelve la mitad creada.
+ */
+export async function createSplitPartner(firstId: string): Promise<StoredProxy> {
+  const first = await getProxy(firstId)
+  if (!first) throw new Error(`No existe el proxy ${firstId}`)
+  if (first.splitPartnerId) throw new Error('Este proxy ya tiene otra mitad')
+
+  const now = Date.now()
+  const base = proxyDesignSchema.parse({
+    id: crypto.randomUUID(),
+    frameColor: first.frameColor,
+    createdAt: now,
+    updatedAt: now,
+  })
+  const partner: StoredProxy = {
+    ...base,
+    isSplitPartner: true,
+    text: { ...base.text, name: first.text.name ? `${first.text.name} (mitad)` : '' },
+  }
+
+  await db.proxies.add(partner)
+  await db.proxies.update(firstId, { splitPartnerId: partner.id, updatedAt: now })
+  return partner
+}
+
+/**
+ * Quita la otra mitad de una Split: la borra (borrado lógico) y limpia el
+ * `splitPartnerId` de la primera mitad.
+ */
+export async function removeSplitPartner(firstId: string): Promise<void> {
+  const first = await getProxy(firstId)
+  if (!first?.splitPartnerId) return
+
+  const now = Date.now()
+  await db.proxies.update(first.splitPartnerId, { deletedAt: now, updatedAt: now })
+  await db.proxies.update(firstId, { splitPartnerId: null, updatedAt: now })
+}
+
+/**
  * Completa un proxy con los valores por defecto del esquema. Devuelve el mismo
  * objeto si ya estaba completo, para no crear basura en cada lectura.
  */
@@ -261,7 +317,9 @@ export function normalizeProxy(proxy: ProxyDesign): ProxyDesign {
     proxy.edited !== undefined &&
     proxy.text?.note !== undefined &&
     proxy.backFaceId !== undefined &&
-    proxy.isBackFace !== undefined
+    proxy.isBackFace !== undefined &&
+    proxy.splitPartnerId !== undefined &&
+    proxy.isSplitPartner !== undefined
   ) {
     return proxy
   }

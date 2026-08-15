@@ -222,6 +222,25 @@ export const proxyDesignSchema = z.object({
    */
   adventure: adventureSchema.nullable().default(null),
   /**
+   * Split (Fire // Ice, Life // Death): si no es `null`, el `id` de OTRO proxy
+   * de la misma colección que es la otra mitad de este hechizo. A diferencia
+   * de `adventure` (un mini-hechizo superpuesto sobre el marco de una
+   * criatura), en Split las dos mitades son hechizos COMPLETOS e
+   * independientes del mismo tamaño — por eso se modela igual que
+   * `backFaceId`, como un vínculo entre dos `ProxyDesign` normales, cada uno
+   * con su propio `layout`. Lo que cambia frente al doble cara es sólo la
+   * composición: las dos mitades se ven a la vez, lado a lado y rotadas 90°,
+   * en la MISMA cara física (ver `renderSplit` en el renderizador), no una
+   * detrás de otra.
+   */
+  splitPartnerId: z.string().nullable().default(null),
+  /**
+   * Marca que ESTE proxy es la segunda mitad de una Split. Igual que
+   * `isBackFace`: lo oculta de los listados de «mis proxies» y evita que se
+   * trate como una carta suelta.
+   */
+  isSplitPartner: z.boolean().default(false),
+  /**
    * Lo ha tocado una persona, no sólo el volcado automático de la carta. Es lo
    * que permite ir por un mazo entero sabiendo qué queda por hacer.
    */

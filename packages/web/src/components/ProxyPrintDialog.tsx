@@ -4,7 +4,7 @@ import type { ProxyDesign } from '@magic/shared'
 import { Modal } from './Modal.js'
 import { BackOptions, NO_BACK, resolveBack, type BackChoice } from './BackOptions.js'
 import { buildPdf, downloadPdf, type PageSize } from '../print/pdf.js'
-import { renderProxyToPng } from '../print/render-for-print.js'
+import { renderProxyToPng, renderSplitToPng } from '../print/render-for-print.js'
 
 /**
  * Imprime una selección de proxies. Con una sola carta ofrece llenar la hoja con
@@ -33,6 +33,21 @@ export function ProxyPrintDialog({
       const cards = []
       for (const [index, design] of designs.entries()) {
         setStatus(`Renderizando… ${index + 1}/${designs.length}`)
+
+        if (design.splitPartnerId) {
+          // Split: una sola posición en la rejilla con las dos mitades ya
+          // compuestas, no dos cartas sueltas.
+          const partner = await getProxy(design.splitPartnerId)
+          cards.push({
+            bytes: partner
+              ? await renderSplitToPng(design, partner)
+              : await renderProxyToPng(design),
+            type: 'png' as const,
+            qty: copies,
+          })
+          continue
+        }
+
         cards.push({ bytes: await renderProxyToPng(design), type: 'png' as const, qty: copies })
 
         // Doble cara: el dorso se imprime justo detrás, como una carta más de

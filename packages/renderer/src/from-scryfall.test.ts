@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { cardSchema } from '@magic/shared'
-import { cardToDesign } from './from-scryfall.js'
+import { cardToDesign, isSplitCard, splitPartnerDesignOf } from './from-scryfall.js'
 
 const teferi = cardSchema.parse({
   id: 'teferi',
@@ -127,6 +127,65 @@ const wizardClass = cardSchema.parse({
     'Whenever you draw a card, put a +1/+1 counter on target creature you control.',
 })
 
+/**
+ * Split real (Scryfall): `layout: 'split'`, `card_faces` con dos hechizos
+ * completos e independientes, cada uno con su propio `mana_cost`/
+ * `type_line`/`oracle_text`/nombre. A diferencia de Adventure/Battle, ninguna
+ * mitad es "la principal": las dos se modelan como proxies completos aparte
+ * (ver `splitPartnerDesignOf`), no como un campo embebido.
+ */
+const fireIce = cardSchema.parse({
+  id: 'fire-ice',
+  name: 'Fire // Ice',
+  layout: 'split',
+  mana_cost: '{1}{R} // {1}{U}',
+  type_line: 'Instant // Instant',
+  colors: ['R', 'U'],
+  color_identity: ['R', 'U'],
+  legalities: {},
+  set: 'apc',
+  card_faces: [
+    {
+      name: 'Fire',
+      mana_cost: '{1}{R}',
+      type_line: 'Instant',
+      colors: ['R'],
+      oracle_text: 'Fire deals 2 damage divided as you choose among one or two targets.',
+    },
+    {
+      name: 'Ice',
+      mana_cost: '{1}{U}',
+      type_line: 'Instant',
+      colors: ['U'],
+      oracle_text: 'Tap target permanent.\nDraw a card.',
+    },
+  ],
+})
+
+const lifeDeath = cardSchema.parse({
+  id: 'life-death',
+  name: 'Life // Death',
+  layout: 'split',
+  mana_cost: '{G} // {B}',
+  type_line: 'Sorcery // Sorcery',
+  colors: ['G', 'B'],
+  color_identity: ['G', 'B'],
+  legalities: {},
+  set: 'inv',
+  card_faces: [
+    { name: 'Life', mana_cost: '{G}', type_line: 'Sorcery', colors: ['G'], oracle_text: 'You gain 7 life.' },
+    {
+      name: 'Death',
+      mana_cost: '{B}',
+      type_line: 'Sorcery',
+      colors: ['B'],
+      oracle_text:
+        'As an additional cost to cast this spell, sacrifice a creature or discard a card.\n' +
+        'Target creature gets -1/-1 until end of turn.',
+    },
+  ],
+})
+
 describe('cardToDesign', () => {
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
@@ -203,6 +262,46 @@ describe('cardToDesign', () => {
         text: 'Whenever you draw a card, put a +1/+1 counter on target creature you control.',
       },
     ])
+  })
+
+  it('detecta una Split y crea la primera mitad con la cara izquierda', () => {
+    expect(isSplitCard(fireIce)).toBe(true)
+    const design = cardToDesign(fireIce, { id: 'x', now: 0, splitPartnerId: 'y' })
+    expect(design.layout).toBe('card')
+    expect(design.text.name).toBe('Fire')
+    expect(design.text.mana).toBe('{1}{R}')
+    expect(design.text.type).toBe('Instant')
+    expect(design.text.oracle).toBe(
+      'Fire deals 2 damage divided as you choose among one or two targets.',
+    )
+    expect(design.splitPartnerId).toBe('y')
+    expect(design.isSplitPartner).toBe(false)
+  })
+
+  it('crea la segunda mitad de una Split ya vinculada a la primera', () => {
+    const partner = splitPartnerDesignOf(fireIce, { id: 'y', now: 0, firstId: 'x' })
+    expect(partner?.layout).toBe('card')
+    expect(partner?.text.name).toBe('Ice')
+    expect(partner?.text.mana).toBe('{1}{U}')
+    expect(partner?.text.type).toBe('Instant')
+    expect(partner?.text.oracle).toBe('Tap target permanent.\nDraw a card.')
+    expect(partner?.splitPartnerId).toBe('x')
+    expect(partner?.isSplitPartner).toBe(true)
+  })
+
+  it('Life // Death: cada mitad se queda con su propio coste y texto', () => {
+    const life = cardToDesign(lifeDeath, { id: 'x', now: 0, splitPartnerId: 'y' })
+    expect(life.text.name).toBe('Life')
+    expect(life.text.mana).toBe('{G}')
+    expect(life.text.oracle).toBe('You gain 7 life.')
+
+    const death = splitPartnerDesignOf(lifeDeath, { id: 'y', now: 0, firstId: 'x' })
+    expect(death?.text.name).toBe('Death')
+    expect(death?.text.mana).toBe('{B}')
+    expect(death?.text.oracle).toBe(
+      'As an additional cost to cast this spell, sacrifice a creature or discard a card.\n' +
+        'Target creature gets -1/-1 until end of turn.',
+    )
   })
 
   it('una carta normal no lleva capa de planeswalker', () => {

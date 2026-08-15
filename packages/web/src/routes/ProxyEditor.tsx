@@ -19,7 +19,15 @@ import { ProxyPrintDialog } from '../components/ProxyPrintDialog.js'
 import { RichTextField } from '../components/RichTextField.js'
 import { buildPdf, downloadPdf } from '../print/pdf.js'
 import { renderProxyToPng } from '../print/render-for-print.js'
-import { createBackFace, deleteProxy, newId, removeBackFace, useProxy } from '../lib/db-hooks.js'
+import {
+  createBackFace,
+  createSplitPartner,
+  deleteProxy,
+  newId,
+  removeBackFace,
+  removeSplitPartner,
+  useProxy,
+} from '../lib/db-hooks.js'
 import { useConfirmLeave } from '../lib/use-confirm-leave.js'
 
 type BasicSymbol = NonNullable<ProxyDesign['basicWatermark']>
@@ -169,6 +177,25 @@ export function ProxyEditor() {
     if (!confirm('¿Quitar y borrar el dorso de esta carta?')) return
     await removeBackFace(draft.id)
     setDraft((current) => (current ? { ...current, backFaceId: null } : current))
+  }
+
+  /** Mismo patrón que `addBackFace`/`removeBack`, para la otra mitad de una Split. */
+  const addSplitPartner = async () => {
+    setStatus('Creando la otra mitad…')
+    try {
+      const partnerId = await createSplitPartner(draft.id)
+      setDraft((current) => (current ? { ...current, splitPartnerId: partnerId } : current))
+      setStatus(null)
+      navigate(`/proxies/${partnerId}`)
+    } catch (error) {
+      setStatus(`Error: ${(error as Error).message}`)
+    }
+  }
+
+  const removeSplit = async () => {
+    if (!confirm('¿Quitar y borrar la otra mitad de esta Split?')) return
+    await removeSplitPartner(draft.id)
+    setDraft((current) => (current ? { ...current, splitPartnerId: null } : current))
   }
 
   const exportJson = async () => {
@@ -511,6 +538,54 @@ export function ProxyEditor() {
             <Section title="Reverso">
               <p className="text-sm text-muted">
                 Esta carta ES el dorso de otra. Se gestiona desde el editor del frente.
+              </p>
+            </Section>
+          )}
+
+          {!draft.isSplitPartner && (
+            <Section title="Split">
+              {draft.splitPartnerId ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-muted">Esta carta es una mitad de una Split.</p>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/proxies/${draft.splitPartnerId}`)}
+                    className="rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+                  >
+                    Editar la otra mitad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void removeSplit()}
+                    className="rounded border border-edge px-3 py-1.5 text-sm text-muted hover:border-red-500 hover:text-red-400"
+                  >
+                    Quitar otra mitad
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-muted">
+                    Carta Split (Fire // Ice): crea la otra mitad como un hechizo completo aparte,
+                    vinculado a este. Las dos se imprimen juntas, apaisadas y rotadas 90°, en una
+                    sola carta física.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void addSplitPartner()}
+                    className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+                  >
+                    Añadir otra mitad
+                  </button>
+                </div>
+              )}
+            </Section>
+          )}
+
+          {draft.isSplitPartner && (
+            <Section title="Split">
+              <p className="text-sm text-muted">
+                Esta carta ES la otra mitad de una Split. Se gestiona desde el editor de la
+                primera mitad.
               </p>
             </Section>
           )}

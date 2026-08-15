@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { db, isAlive, scryfall, type StoredProxy } from '@magic/cards'
-import { cardToDesign } from '@magic/renderer'
+import { cardToDesign, isSplitCard, splitPartnerDesignOf } from '@magic/renderer'
 import type { Card, DeckEntry, ProxyDesign } from '@magic/shared'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CardPreview } from '../components/CardPreview.js'
@@ -69,11 +69,16 @@ export function DeckProxies() {
           icons.set(card.set, await scryfall.setIcon(card.set).catch(() => undefined))
         }
 
-        const design = cardToDesign(card, { id: newId(), now })
+        const partnerId = isSplitCard(card) ? newId() : undefined
+        const design = cardToDesign(card, { id: newId(), now, splitPartnerId: partnerId })
         const icon = icons.get(card.set)
         if (icon) design.setSymbol = icon
 
-        await db.proxies.add(design)
+        const partner = partnerId
+          ? splitPartnerDesignOf(card, { id: partnerId, now, firstId: design.id })
+          : null
+        if (partner) await db.proxies.bulkAdd([design, partner])
+        else await db.proxies.add(design)
         created[entry.cardId] = design.id
       }
 
@@ -227,6 +232,15 @@ function ProxyCell({
               className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
             >
               ⟲ dorso
+            </span>
+          )}
+          {design.splitPartnerId && (
+            <span
+              title="Split: tiene otra mitad"
+              className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
+              style={design.backFaceId ? { top: '1.75rem' } : undefined}
+            >
+              ⇄ split
             </span>
           )}
         </Link>

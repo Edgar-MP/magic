@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { db, scryfall } from '@magic/cards'
-import { cardToDesign } from '@magic/renderer'
+import { cardToDesign, isSplitCard, splitPartnerDesignOf } from '@magic/renderer'
 import { proxyFileSchema, type ProxyDesign } from '@magic/shared'
 import { CardSearch } from '../components/CardSearch.js'
 import { CardPreview } from '../components/CardPreview.js'
@@ -18,11 +18,23 @@ export function Proxies() {
   const create = async (cardId: string) => {
     const card = await scryfall.byId(cardId)
     if (!card) return
-    const design = cardToDesign(card, { id: newId(), now: Date.now() })
+
+    const now = Date.now()
+    // Split (Fire // Ice): dos hechizos completos, cada uno su propio proxy,
+    // enlazados por `splitPartnerId` — se crean y guardan los dos a la vez.
+    const partnerId = isSplitCard(card) ? newId() : undefined
+    const design = cardToDesign(card, { id: newId(), now, splitPartnerId: partnerId })
     // El símbolo de expansión hay que pedirlo aparte: no viene en la carta.
     const icon = await scryfall.setIcon(card.set).catch(() => undefined)
     if (icon) design.setSymbol = icon
-    await db.proxies.add(design)
+
+    if (partnerId) {
+      const partner = splitPartnerDesignOf(card, { id: partnerId, now, firstId: design.id })
+      if (partner) await db.proxies.bulkAdd([design, partner])
+      else await db.proxies.add(design)
+    } else {
+      await db.proxies.add(design)
+    }
     navigate(`/proxies/${design.id}`)
   }
 
@@ -55,6 +67,8 @@ export function Proxies() {
       defense: '',
       backFaceId: null,
       isBackFace: false,
+      splitPartnerId: null,
+      isSplitPartner: false,
       adventure: null,
       createdAt: now,
       updatedAt: now,
@@ -151,6 +165,15 @@ export function Proxies() {
                   className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
                 >
                   ⟲ dorso
+                </span>
+              )}
+              {design.splitPartnerId && (
+                <span
+                  title="Split: tiene otra mitad"
+                  className="absolute right-1.5 top-1.5 rounded border border-accent bg-ink/80 px-1.5 py-0.5 text-[10px] text-accent"
+                  style={design.backFaceId ? { top: '1.75rem' } : undefined}
+                >
+                  ⇄ split
                 </span>
               )}
             </Link>

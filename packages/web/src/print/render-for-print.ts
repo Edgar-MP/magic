@@ -1,5 +1,5 @@
 import { getBlob, getProxy } from '@magic/cards'
-import { PRINT_WIDTH, renderCard, renderCardBack } from '@magic/renderer'
+import { PRINT_WIDTH, renderCard, renderCardBack, renderSplit } from '@magic/renderer'
 import type { Card, Deck, ProxyDesign } from '@magic/shared'
 import { browserEnv } from '../env-browser.js'
 import type { PrintCard } from './pdf.js'
@@ -16,6 +16,26 @@ export async function renderProxyToPng(design: ProxyDesign): Promise<Uint8Array>
   const surface = await renderCard(design, browserEnv, {
     width: PRINT_WIDTH,
     ...(art ? { art } : {}),
+  })
+  const blob = await surface.toBlob('image/png')
+  return new Uint8Array(await blob.arrayBuffer())
+}
+
+/**
+ * Renderiza una Split (las dos mitades ya compuestas, apaisadas y rotadas) a
+ * PNG al tamaño de impresión. A diferencia del doble cara, esto es UNA sola
+ * posición en la rejilla de impresión, no dos.
+ */
+export async function renderSplitToPng(first: ProxyDesign, second: ProxyDesign): Promise<Uint8Array> {
+  const [firstArt, secondArt] = await Promise.all([
+    first.art.blobId ? getBlob(first.art.blobId) : undefined,
+    second.art.blobId ? getBlob(second.art.blobId) : undefined,
+  ])
+
+  const surface = await renderSplit(first, second, browserEnv, {
+    width: PRINT_WIDTH,
+    ...(firstArt ? { leftArt: firstArt } : {}),
+    ...(secondArt ? { rightArt: secondArt } : {}),
   })
   const blob = await surface.toBlob('image/png')
   return new Uint8Array(await blob.arrayBuffer())
@@ -98,7 +118,16 @@ export async function renderDeckForPrint(
       // Un proxy borrado no se imprime: se cae a la imagen oficial de la carta.
       const design = entry.proxyId ? await getProxy(entry.proxyId) : undefined
 
-      if (design) {
+      if (design?.splitPartnerId) {
+        // Split: las dos mitades van compuestas en una sola posición de la
+        // rejilla, no como dos cartas sueltas (a diferencia del doble cara).
+        const partner = await getProxy(design.splitPartnerId)
+        result.cards.push({
+          bytes: partner ? await renderSplitToPng(design, partner) : await renderProxyToPng(design),
+          type: 'png',
+          qty: entry.qty,
+        })
+      } else if (design) {
         result.cards.push({ bytes: await renderProxyToPng(design), type: 'png', qty: entry.qty })
 
         // Doble cara: el dorso va justo detrás en la rejilla de impresión,

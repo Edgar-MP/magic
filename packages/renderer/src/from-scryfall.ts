@@ -191,6 +191,76 @@ function adventureOf(card: Card): Adventure | null {
   }
 }
 
+/**
+ * Split (`layout: 'split'`, como Fire // Ice, Life // Death): a diferencia de
+ * Adventure/Battle, las dos caras son hechizos completos e independientes del
+ * mismo tamaño, sin marco de criatura de fondo — así que, a diferencia de
+ * `adventure`, aquí no se rellena un campo embebido: se crean DOS
+ * `ProxyDesign` normales (uno por `cardToDesign`, con `card_faces[0]`, y otro
+ * con `splitPartnerDesignOf`, con `card_faces[1]`), enlazados por
+ * `splitPartnerId`/`isSplitPartner` — quien llame decide si los persiste.
+ */
+export function isSplitCard(card: Card): boolean {
+  return card.layout === 'split' && (card.card_faces?.length ?? 0) >= 2
+}
+
+/**
+ * La segunda mitad de una Split, como `ProxyDesign` independiente ya
+ * vinculado (`isSplitPartner: true`) a `firstId`. Quien llame tiene que
+ * vincular también `splitPartnerId` en la primera mitad (normalmente el
+ * resultado de `cardToDesign`) antes de guardar ambos.
+ */
+export function splitPartnerDesignOf(
+  card: Card,
+  { id, now, firstId }: CardToDesignOptions & { firstId: string },
+): ProxyDesign | null {
+  const spell = card.card_faces?.[1]
+  if (!isSplitCard(card) || !spell) return null
+
+  const frame = chooseFrame(card)
+
+  return {
+    id,
+    sourceCardId: card.id,
+    layout: 'card',
+    frameSet: 'm15',
+    variant: 'regular',
+    edited: false,
+    frameColor: frame.frameColor,
+    ...(frame.secondColor ? { secondColor: frame.secondColor } : {}),
+    flags: {
+      legendary: isLegendary(card),
+      nyx: false,
+      stamp: wantsStamp(card),
+      showPt: false,
+    },
+    art: { x: 0, y: 0, scale: 1 },
+    text: {
+      name: spell.name,
+      mana: spell.mana_cost ?? '',
+      type: spell.type_line ?? '',
+      oracle: spell.oracle_text ?? '',
+      flavor: spell.flavor_text ?? '',
+      note: '',
+      pt: '',
+      artist: spell.artist ?? card.artist ?? '',
+      info: infoLine(card),
+    },
+    loyalty: '',
+    abilities: [],
+    chapters: [],
+    levels: [],
+    defense: '',
+    backFaceId: null,
+    isBackFace: false,
+    splitPartnerId: firstId,
+    isSplitPartner: true,
+    adventure: null,
+    createdAt: now,
+    updatedAt: now,
+  }
+}
+
 /** Línea inferior: `M10 · 146 · ES`, como la de las cartas reales. */
 function infoLine(card: Card): string {
   return [card.set.toUpperCase(), card.collector_number, card.rarity?.[0]?.toUpperCase()]
@@ -203,13 +273,19 @@ export interface CardToDesignOptions {
   now: number
   /** Usa la ilustración oficial de Scryfall como punto de partida. */
   useOfficialArt?: boolean
+  /**
+   * Sólo para Split: el id que va a tener la otra mitad (creada aparte con
+   * `splitPartnerDesignOf`), para dejarlo enlazado en `splitPartnerId`.
+   */
+  splitPartnerId?: string
 }
 
 export function cardToDesign(
   card: Card,
-  { id, now, useOfficialArt = true }: CardToDesignOptions,
+  { id, now, useOfficialArt = true, splitPartnerId }: CardToDesignOptions,
 ): ProxyDesign {
   const face = card.card_faces?.[0]
+  const split = isSplitCard(card)
   const frame = chooseFrame(card)
   const pt = ptOf(card)
   const watermark = basicWatermarkOf(card)
@@ -265,16 +341,18 @@ export function cardToDesign(
     ...(watermark ? { basicWatermark: watermark } : {}),
     text: {
       name: card.name.split(' // ')[0] ?? card.name,
-      // Una Adventure real es de doble cara (`adventure`): igual que Battle,
-      // el `mana_cost`/`type_line`/`oracle_text` de la raíz junta los de las
-      // dos caras («{2}{R} // {1}{R}»), así que hay que quedarse con el de la
-      // cara principal (la criatura), no con el combinado.
-      mana: (adventure ? face?.mana_cost : undefined) ?? card.mana_cost ?? face?.mana_cost ?? '',
+      // Una Adventure/Split real es de doble cara: igual que Battle, el
+      // `mana_cost`/`type_line`/`oracle_text` de la raíz junta los de las dos
+      // caras («{2}{R} // {1}{R}»), así que hay que quedarse con el de la cara
+      // principal (para Split, `card_faces[0]`; la segunda mitad la crea
+      // aparte `splitPartnerDesignOf`).
+      mana:
+        (adventure || split ? face?.mana_cost : undefined) ?? card.mana_cost ?? face?.mana_cost ?? '',
       // Una Battle real es de doble cara (`transform`): el `type_line` de la
       // raíz junta las dos («Battle — Siege // Creature — …»), así que aquí
       // hay que quedarse con el de la cara frontal, no con el combinado.
       type:
-        (battle || adventure ? face?.type_line : undefined) ??
+        (battle || adventure || split ? face?.type_line : undefined) ??
         card.type_line ??
         face?.type_line ??
         '',
@@ -282,12 +360,15 @@ export function cardToDesign(
       // Scryfall pone como texto de reglas.
       oracle: watermark
         ? ''
-        : ((adventure ? face?.oracle_text : undefined) ?? card.oracle_text ?? face?.oracle_text ?? ''),
+        : ((adventure || split ? face?.oracle_text : undefined) ??
+          card.oracle_text ??
+          face?.oracle_text ??
+          ''),
       flavor: card.flavor_text ?? face?.flavor_text ?? '',
       // La etiqueta la escribe quien haga el proxy: en blanco por defecto.
       note: '',
       pt,
-      artist: card.artist ?? face?.artist ?? '',
+      artist: (split ? face?.artist : undefined) ?? card.artist ?? face?.artist ?? '',
       info: infoLine(card),
     },
     loyalty,
@@ -297,6 +378,8 @@ export function cardToDesign(
     defense,
     backFaceId: null,
     isBackFace: false,
+    splitPartnerId: split ? (splitPartnerId ?? null) : null,
+    isSplitPartner: false,
     adventure,
     createdAt: now,
     updatedAt: now,
