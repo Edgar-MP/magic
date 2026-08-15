@@ -384,7 +384,7 @@ function DeckRow({
     { board: 'command', label: 'mando' },
   ]
 
-  const displayName = proxy?.text.name || card?.name || entry.cardId
+  const displayName = proxy?.text.name || card?.printed_name || card?.name || entry.cardId
   const image = card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal
 
   // Sigue al cursor en vez de anclarse a la fila: en la vista de lista las
@@ -430,7 +430,7 @@ function DeckRow({
           {displayName}
         </Link>
       ) : (
-        <span className="min-w-0 flex-1 truncate" title={card?.type_line}>
+        <span className="min-w-0 flex-1 truncate" title={card?.printed_type_line ?? card?.type_line}>
           {displayName}
         </span>
       )}
@@ -501,7 +501,7 @@ function DeckGridItem({
   proxy: StoredProxy | undefined
 }) {
   const image = card?.image_uris?.normal ?? card?.card_faces?.[0]?.image_uris?.normal
-  const displayName = proxy?.text.name || card?.name || entry.cardId
+  const displayName = proxy?.text.name || card?.printed_name || card?.name || entry.cardId
 
   return (
     <Link

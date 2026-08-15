@@ -233,7 +233,7 @@ function ProxyCell({
   card: Card | undefined
   design: ProxyDesign | undefined
 }) {
-  const name = card?.name ?? entry.cardId
+  const name = card?.printed_name ?? card?.name ?? entry.cardId
 
   return (
     <li className="flex flex-col gap-2">

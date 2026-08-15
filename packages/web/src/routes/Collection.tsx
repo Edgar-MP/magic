@@ -77,7 +77,7 @@ export function Collection() {
                     onChange={(e) => void setCollectionQty(item.cardId, Number(e.target.value))}
                     className="tabular w-14 rounded border border-edge bg-ink px-1 py-0.5 text-center outline-none focus:border-accent"
                   />
-                  <span className="min-w-0 flex-1 truncate">{card?.name ?? item.cardId}</span>
+                  <span className="min-w-0 flex-1 truncate">{card?.printed_name ?? card?.name ?? item.cardId}</span>
                   <ManaCost cost={card?.mana_cost} />
                 </li>
               )
