@@ -66,6 +66,15 @@ function HoverPreview({ hover }: { hover: HoverState | null }) {
 
 const SYNTAX = /[:<>=]|\bor\b|\band\b/i
 
+type SearchLang = 'es' | 'en'
+
+const LANG_KEY = 'magic:search-lang'
+
+function loadSearchLang(): SearchLang {
+  if (typeof localStorage === 'undefined') return 'en'
+  return localStorage.getItem(LANG_KEY) === 'es' ? 'es' : 'en'
+}
+
 function useLocalIndex(): boolean {
   const [ready, setReady] = useState(indexReady())
 
@@ -111,7 +120,14 @@ export function CardSearch({
   const [text, setText] = useState('')
   const [hover, setHover] = useState<HoverState | null>(null)
   const [remoteQuery, setRemoteQuery] = useState('')
+  const [lang, setLang] = useState<SearchLang>(() => loadSearchLang())
+  const [fallbackNotice, setFallbackNotice] = useState(false)
   const hasIndex = useLocalIndex()
+
+  const setSearchLang = (next: SearchLang) => {
+    setLang(next)
+    localStorage.setItem(LANG_KEY, next)
+  }
 
   const usesSyntax = SYNTAX.test(text)
 
@@ -132,12 +148,13 @@ export function CardSearch({
   }, [proxies, text])
 
   const remote = useQuery({
-    queryKey: ['search', remoteQuery, format, identity?.join('')],
+    queryKey: ['search', remoteQuery, format, identity?.join(''), lang],
     enabled: remoteQuery.trim() !== '',
     queryFn: async () => {
       const parts = [remoteQuery]
       if (format) parts.push(`legal:${format}`)
       if (identity) parts.push(`ci<=${identity.length > 0 ? identity.join('') : 'c'}`)
+      if (lang === 'es') parts.push('lang:es')
       const result = await scryfall.search(parts.join(' '), { unique: 'cards', order: 'name' })
       await putCards(result.cards)
       return result
@@ -149,7 +166,19 @@ export function CardSearch({
   }
 
   /** Las sugerencias locales sólo traen el id: hay que traerse la carta entera. */
-  const pickLocal = async (id: string) => {
+  const pickLocal = async (id: string, name: string) => {
+    setFallbackNotice(false)
+    if (lang === 'es') {
+      const spanish = await scryfall.search(`!"${name}" lang:es`, { unique: 'cards' })
+      const match = spanish.cards.find((c) => c.name.toLowerCase() === name.toLowerCase()) ?? spanish.cards[0]
+      if (match) {
+        await putCards([match])
+        onPick(match)
+        setText('')
+        return
+      }
+      setFallbackNotice(true)
+    }
     const card = await scryfall.byId(id)
     if (!card) return
     await putCards([card])
@@ -158,6 +187,7 @@ export function CardSearch({
   }
 
   const pickRemote = (card: Card) => {
+    setFallbackNotice(false)
     onPick(card)
     setText('')
     setRemoteQuery('')
@@ -169,7 +199,10 @@ export function CardSearch({
         <input
           value={text}
           autoFocus={autoFocus}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value)
+            setFallbackNotice(false)
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') submit()
             if (e.key === 'Escape') setText('')
@@ -184,7 +217,27 @@ export function CardSearch({
         >
           Buscar
         </button>
+        <div className="flex shrink-0 overflow-hidden rounded border border-edge text-xs">
+          <button
+            type="button"
+            onClick={() => setSearchLang('en')}
+            className={`px-2 py-2 font-semibold ${lang === 'en' ? 'bg-accent text-white' : 'bg-panel hover:bg-edge'}`}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => setSearchLang('es')}
+            className={`px-2 py-2 font-semibold ${lang === 'es' ? 'bg-accent text-white' : 'bg-panel hover:bg-edge'}`}
+          >
+            ES
+          </button>
+        </div>
       </div>
+
+      {fallbackNotice && (
+        <p className="text-xs text-muted">Sin edición en español, se usó inglés.</p>
+      )}
 
       {usesSyntax && remoteQuery === '' && (
         <p className="text-xs text-muted">
@@ -223,7 +276,7 @@ export function CardSearch({
             <li key={entry.id}>
               <button
                 type="button"
-                onClick={() => void pickLocal(entry.id)}
+                onClick={() => void pickLocal(entry.id, entry.name)}
                 onMouseEnter={(e) => setHover({ x: e.clientX, y: e.clientY, localId: entry.id })}
                 onMouseMove={(e) => setHover({ x: e.clientX, y: e.clientY, localId: entry.id })}
                 onMouseLeave={() => setHover(null)}

@@ -105,10 +105,8 @@ function ptOf(card: Card): string {
  */
 const ABILITY_LINE = /^([+−-]?(?:X|\d+))\s*:\s*(.+)$/su
 
-function planeswalkerAbilitiesOf(card: Card): PlaneswalkerAbility[] {
-  const oracle = card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? ''
+function abilitiesFrom(oracle: string): PlaneswalkerAbility[] {
   const abilities: PlaneswalkerAbility[] = []
-
   for (const line of oracle.split('\n')) {
     const match = ABILITY_LINE.exec(line.trim())
     if (match?.[1] && match[2]) {
@@ -118,6 +116,15 @@ function planeswalkerAbilitiesOf(card: Card): PlaneswalkerAbility[] {
   return abilities
 }
 
+function planeswalkerAbilitiesOf(card: Card): PlaneswalkerAbility[] {
+  const printed = card.printed_text ?? card.card_faces?.[0]?.printed_text ?? ''
+  const fromPrinted = printed ? abilitiesFrom(printed) : []
+  if (fromPrinted.length > 0) return fromPrinted
+
+  const oracle = card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? ''
+  return abilitiesFrom(oracle)
+}
+
 /**
  * El oracle de una saga es un capítulo por línea, con su número (o rango de
  * números, cuando varios capítulos comparten efecto: `I, II — …`) delante de
@@ -125,10 +132,8 @@ function planeswalkerAbilitiesOf(card: Card): PlaneswalkerAbility[] {
  */
 const CHAPTER_LINE = /^([IVX]+(?:\s*,\s*[IVX]+)*)\s*—\s*(.+)$/su
 
-function sagaChaptersOf(card: Card): SagaChapter[] {
-  const oracle = card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? ''
+function chaptersFrom(oracle: string): SagaChapter[] {
   const chapters: SagaChapter[] = []
-
   for (const line of oracle.split('\n')) {
     const match = CHAPTER_LINE.exec(line.trim())
     if (match?.[1] && match[2]) {
@@ -136,6 +141,15 @@ function sagaChaptersOf(card: Card): SagaChapter[] {
     }
   }
   return chapters
+}
+
+function sagaChaptersOf(card: Card): SagaChapter[] {
+  const printed = card.printed_text ?? card.card_faces?.[0]?.printed_text ?? ''
+  const fromPrinted = printed ? chaptersFrom(printed) : []
+  if (fromPrinted.length > 0) return fromPrinted
+
+  const oracle = card.oracle_text ?? card.card_faces?.[0]?.oracle_text ?? ''
+  return chaptersFrom(oracle)
 }
 
 /**
@@ -148,16 +162,17 @@ function sagaChaptersOf(card: Card): SagaChapter[] {
  */
 const LEVEL_LINE = /^(\{[^}]+\}(?:\{[^}]+\})*)\s*:\s*Level\s*\d+\s*$/u
 
-function classLevelsOf(card: Card): ClassLevel[] {
-  const oracle = card.oracle_text ?? ''
+function levelsFrom(oracle: string): ClassLevel[] {
   const lines = oracle.split('\n')
 
   const levels: ClassLevel[] = [{ cost: '', typeLine: '', text: '' }]
   let currentText: string[] = []
+  let found = false
 
   for (const line of lines) {
     const match = LEVEL_LINE.exec(line.trim())
     if (match?.[1]) {
+      found = true
       const current = levels[levels.length - 1]
       if (current) current.text = currentText.join('\n')
       currentText = []
@@ -170,7 +185,17 @@ function classLevelsOf(card: Card): ClassLevel[] {
   const last = levels[levels.length - 1]
   if (last) last.text = currentText.join('\n')
 
-  return levels
+  return found ? levels : []
+}
+
+function classLevelsOf(card: Card): ClassLevel[] {
+  const printed = card.printed_text ?? ''
+  const fromPrinted = printed ? levelsFrom(printed) : []
+  if (fromPrinted.length > 0) return fromPrinted
+
+  const oracle = card.oracle_text ?? ''
+  const fromOracle = levelsFrom(oracle)
+  return fromOracle.length > 0 ? fromOracle : [{ cost: '', typeLine: '', text: oracle }]
 }
 
 /**
@@ -184,10 +209,10 @@ function adventureOf(card: Card): Adventure | null {
   const spell = card.card_faces?.[1]
   if (!spell) return null
   return {
-    name: spell.name,
+    name: spell.printed_name ?? spell.name,
     mana: spell.mana_cost ?? '',
-    type: spell.type_line ?? '',
-    oracle: spell.oracle_text ?? '',
+    type: spell.printed_type_line ?? spell.type_line ?? '',
+    oracle: spell.printed_text ?? spell.oracle_text ?? '',
   }
 }
 
@@ -236,10 +261,10 @@ export function splitPartnerDesignOf(
     },
     art: { x: 0, y: 0, scale: 1 },
     text: {
-      name: spell.name,
+      name: spell.printed_name ?? spell.name,
       mana: spell.mana_cost ?? '',
-      type: spell.type_line ?? '',
-      oracle: spell.oracle_text ?? '',
+      type: spell.printed_type_line ?? spell.type_line ?? '',
+      oracle: spell.printed_text ?? spell.oracle_text ?? '',
       flavor: spell.flavor_text ?? '',
       note: '',
       pt: '',
@@ -318,10 +343,10 @@ export function flipPartnerDesignOf(
     },
     art: { x: 0, y: 0, scale: 1 },
     text: {
-      name: face.name,
+      name: face.printed_name ?? face.name,
       mana: face.mana_cost ?? '',
-      type: face.type_line ?? '',
-      oracle: face.oracle_text ?? '',
+      type: face.printed_type_line ?? face.type_line ?? '',
+      oracle: face.printed_text ?? face.oracle_text ?? '',
       flavor: face.flavor_text ?? '',
       note: '',
       pt,
@@ -430,7 +455,7 @@ export function cardToDesign(
     },
     ...(watermark ? { basicWatermark: watermark } : {}),
     text: {
-      name: card.name.split(' // ')[0] ?? card.name,
+      name: card.printed_name ?? card.name.split(' // ')[0] ?? card.name,
       // Una Adventure/Split/Flip real es de doble cara: igual que Battle, el
       // `mana_cost`/`type_line`/`oracle_text` de la raíz junta los de las dos
       // caras («{2}{R} // {1}{R}»), así que hay que quedarse con el de la cara
@@ -445,6 +470,7 @@ export function cardToDesign(
       // raíz junta las dos («Battle — Siege // Creature — …»), así que aquí
       // hay que quedarse con el de la cara frontal, no con el combinado.
       type:
+        card.printed_type_line ??
         (battle || adventure || split || flip ? face?.type_line : undefined) ??
         card.type_line ??
         face?.type_line ??
@@ -453,7 +479,8 @@ export function cardToDesign(
       // Scryfall pone como texto de reglas.
       oracle: watermark
         ? ''
-        : ((adventure || split || flip ? face?.oracle_text : undefined) ??
+        : (card.printed_text ??
+          (adventure || split || flip ? face?.oracle_text : undefined) ??
           card.oracle_text ??
           face?.oracle_text ??
           ''),

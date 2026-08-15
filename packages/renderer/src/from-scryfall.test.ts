@@ -234,7 +234,112 @@ const erayo = cardSchema.parse({
   ],
 })
 
+const rayo = cardSchema.parse({
+  id: 'rayo',
+  name: 'Lightning Bolt',
+  lang: 'es',
+  layout: 'normal',
+  mana_cost: '{R}',
+  type_line: 'Instant',
+  colors: ['R'],
+  color_identity: ['R'],
+  legalities: {},
+  set: 'lea',
+  oracle_text: 'Lightning Bolt deals 3 damage to any target.',
+  printed_name: 'Rayo',
+  printed_type_line: 'Instantáneo',
+  printed_text: 'El Rayo hace 3 puntos de daño a cualquier objetivo.',
+})
+
+const teferiEs = cardSchema.parse({
+  id: 'teferi-es',
+  name: 'Teferi, Hero of Dominaria',
+  lang: 'es',
+  layout: 'normal',
+  mana_cost: '{3}{W}{U}',
+  type_line: 'Legendary Planeswalker — Teferi',
+  colors: ['W', 'U'],
+  color_identity: ['W', 'U'],
+  legalities: {},
+  set: 'dom',
+  loyalty: '4',
+  oracle_text:
+    '+1: Draw a card. At the beginning of the next end step, untap two lands.\n' +
+    "−3: Put target nonland permanent into its owner's library third from the top.\n" +
+    '−8: You get an emblem with "Whenever you draw a card, exile target permanent an opponent controls."',
+  printed_name: 'Teferi, Héroe de Dominaria',
+  printed_type_line: 'Planeswalker legendario — Teferi',
+  printed_text:
+    '+1: Roba una carta. Al comienzo del próximo paso final, desenreda dos tierras.\n' +
+    '−3: Pon el permanente sin tierra objetivo en la biblioteca de su propietario, en tercera posición desde arriba.\n' +
+    '−8: Obtienes un emblema con "Cada vez que robes una carta, exilia el permanente objetivo que controle un oponente."',
+})
+
+const teferiSinTraduccion = cardSchema.parse({
+  id: 'teferi-sin-traduccion',
+  name: 'Teferi, Hero of Dominaria',
+  layout: 'normal',
+  mana_cost: '{3}{W}{U}',
+  type_line: 'Legendary Planeswalker — Teferi',
+  colors: ['W', 'U'],
+  color_identity: ['W', 'U'],
+  legalities: {},
+  set: 'dom',
+  loyalty: '4',
+  oracle_text:
+    '+1: Draw a card. At the beginning of the next end step, untap two lands.\n' +
+    "−3: Put target nonland permanent into its owner's library third from the top.\n" +
+    '−8: You get an emblem with "Whenever you draw a card, exile target permanent an opponent controls."',
+  // printed_text ausente: sin edición en español conocida.
+})
+
 describe('cardToDesign', () => {
+  it('prefiere el texto impreso (español) sobre el canónico inglés', () => {
+    const design = cardToDesign(rayo, { id: 'x', now: 0 })
+    expect(design.text.name).toBe('Rayo')
+    expect(design.text.type).toBe('Instantáneo')
+    expect(design.text.oracle).toBe('El Rayo hace 3 puntos de daño a cualquier objetivo.')
+    // El coste de maná no cambia entre idiomas.
+    expect(design.text.mana).toBe('{R}')
+  })
+
+  it('detecta las habilidades de un planeswalker contra el printed_text en español', () => {
+    const design = cardToDesign(teferiEs, { id: 'x', now: 0 })
+    expect(design.layout).toBe('planeswalker')
+    expect(design.text.name).toBe('Teferi, Héroe de Dominaria')
+    expect(design.abilities).toEqual([
+      {
+        cost: '+1',
+        text: 'Roba una carta. Al comienzo del próximo paso final, desenreda dos tierras.',
+      },
+      {
+        cost: '-3',
+        text: 'Pon el permanente sin tierra objetivo en la biblioteca de su propietario, en tercera posición desde arriba.',
+      },
+      {
+        cost: '-8',
+        text: 'Obtienes un emblema con "Cada vez que robes una carta, exilia el permanente objetivo que controle un oponente."',
+      },
+    ])
+  })
+
+  it('sin printed_text cae de vuelta al oracle en inglés sin errores', () => {
+    const design = cardToDesign(teferiSinTraduccion, { id: 'x', now: 0 })
+    expect(design.layout).toBe('planeswalker')
+    expect(design.text.name).toBe('Teferi, Hero of Dominaria')
+    expect(design.abilities).toEqual([
+      { cost: '+1', text: 'Draw a card. At the beginning of the next end step, untap two lands.' },
+      {
+        cost: '-3',
+        text: "Put target nonland permanent into its owner's library third from the top.",
+      },
+      {
+        cost: '-8',
+        text: 'You get an emblem with "Whenever you draw a card, exile target permanent an opponent controls."',
+      },
+    ])
+  })
+
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
     expect(design.layout).toBe('planeswalker')
