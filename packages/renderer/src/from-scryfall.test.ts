@@ -103,6 +103,30 @@ const bonecrusherGiant = cardSchema.parse({
   ],
 })
 
+/**
+ * Class real (Scryfall): a diferencia de Saga/Battle/Adventure NO es de doble
+ * cara — `layout: 'class'` y todo el texto vive en el `oracle_text` de la
+ * raíz, un nivel por línea de coste (`{2}{U}: Level 2`).
+ */
+const wizardClass = cardSchema.parse({
+  id: 'wizard-class',
+  name: 'Wizard Class',
+  layout: 'class',
+  mana_cost: '{U}',
+  type_line: 'Enchantment — Class',
+  colors: ['U'],
+  color_identity: ['U'],
+  legalities: {},
+  set: 'afr',
+  oracle_text:
+    '(Gain the next level as a sorcery to add its ability.)\n' +
+    'You have no maximum hand size.\n' +
+    '{2}{U}: Level 2\n' +
+    'When this Class becomes level 2, draw two cards.\n' +
+    '{4}{U}: Level 3\n' +
+    'Whenever you draw a card, put a +1/+1 counter on target creature you control.',
+})
+
 describe('cardToDesign', () => {
   it('detecta un planeswalker y saca sus habilidades del oracle', () => {
     const design = cardToDesign(teferi, { id: 'x', now: 0 })
@@ -160,6 +184,25 @@ describe('cardToDesign', () => {
       type: 'Instant — Adventure',
       oracle: "Damage can't be prevented this turn. Stomp deals 2 damage to any target.",
     })
+  })
+
+  it('detecta una class y saca sus niveles del oracle', () => {
+    const design = cardToDesign(wizardClass, { id: 'x', now: 0 })
+    expect(design.layout).toBe('class')
+    expect(design.text.mana).toBe('{U}')
+    expect(design.levels).toEqual([
+      {
+        cost: '',
+        typeLine: '',
+        text: '(Gain the next level as a sorcery to add its ability.)\nYou have no maximum hand size.',
+      },
+      { cost: '{2}{U}', typeLine: 'Level 2', text: 'When this Class becomes level 2, draw two cards.' },
+      {
+        cost: '{4}{U}',
+        typeLine: 'Level 3',
+        text: 'Whenever you draw a card, put a +1/+1 counter on target creature you control.',
+      },
+    ])
   })
 
   it('una carta normal no lleva capa de planeswalker', () => {

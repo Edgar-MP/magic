@@ -7,6 +7,7 @@ import {
   FRAME_COLORS,
   type Adventure,
   type CardVariant,
+  type ClassLevel,
   type FrameColor,
   type PlaneswalkerAbility,
   type ProxyDesign,
@@ -113,6 +114,22 @@ export function ProxyEditor() {
 
   const removeChapter = (index: number) =>
     update({ chapters: draft.chapters.filter((_, i) => i !== index) })
+
+  const setLevel = (index: number, changes: Partial<ClassLevel>) =>
+    update({
+      levels: draft.levels.map((l, i) => (i === index ? { ...l, ...changes } : l)),
+    })
+
+  const addLevel = () =>
+    update({
+      levels: [
+        ...draft.levels,
+        { cost: '', typeLine: `Level ${draft.levels.length + 2}`, text: '' },
+      ],
+    })
+
+  const removeLevel = (index: number) =>
+    update({ levels: draft.levels.filter((_, i) => i !== index) })
 
   /**
    * Marca el proxy como editado: es lo que permite ir por un mazo entero
@@ -312,6 +329,11 @@ export function ProxyEditor() {
               label="Battle (casillas de defensa)"
               checked={draft.layout === 'battle'}
               onChange={(v) => update({ layout: v ? 'battle' : 'card' })}
+            />
+            <Toggle
+              label="Class (niveles)"
+              checked={draft.layout === 'class'}
+              onChange={(v) => update({ layout: v ? 'class' : 'card' })}
             />
 
             {draft.layout === 'card' && (
@@ -573,6 +595,56 @@ export function ProxyEditor() {
                 className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
               >
                 Añadir capítulo
+              </button>
+            </Section>
+          )}
+
+          {draft.layout === 'class' && (
+            <Section title="Niveles">
+              <p className="text-xs text-muted">
+                El nivel 1 usa el coste normal de la carta (arriba). Los siguientes se
+                activan pagando su propio coste de mejora, en orden.
+              </p>
+              <div className="flex flex-col gap-2">
+                {draft.levels.map((level, i) => (
+                  <div key={i} className="flex flex-col gap-2 rounded border border-edge bg-ink p-2">
+                    <div className="flex gap-2">
+                      <input
+                        value={level.cost}
+                        onChange={(e) => setLevel(i, { cost: e.target.value })}
+                        placeholder={i === 0 ? '(coste normal de la carta)' : '{2}{U}'}
+                        disabled={i === 0}
+                        className="h-fit w-32 shrink-0 rounded border border-edge bg-panel px-2 py-1 text-center text-sm outline-none focus:border-accent disabled:opacity-50"
+                      />
+                      <input
+                        value={level.typeLine}
+                        onChange={(e) => setLevel(i, { typeLine: e.target.value })}
+                        placeholder={i === 0 ? '' : `Level ${i + 1}`}
+                        className="h-fit flex-1 rounded border border-edge bg-panel px-2 py-1 text-sm outline-none focus:border-accent"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeLevel(i)}
+                        className="h-fit shrink-0 rounded border border-edge px-2 py-1 text-xs text-muted hover:border-red-500 hover:text-red-400"
+                      >
+                        Borrar
+                      </button>
+                    </div>
+                    <RichTextField
+                      value={level.text}
+                      onChange={(v) => setLevel(i, { text: v })}
+                      compact
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={addLevel}
+                className="self-start rounded border border-edge bg-panel px-3 py-1.5 text-sm hover:border-accent"
+              >
+                Añadir nivel
               </button>
             </Section>
           )}

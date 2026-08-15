@@ -151,6 +151,15 @@ function manifest(): [string, string][] {
     files.push([`img/frames/m15/battle/mask${mask}.png`, `battle/mask${mask}.png`])
   }
 
+  // Class: marco por color (w,u,b,r,g más m=multicolor, a=artefacto,
+  // l=tierra, sin vehículo propio: cae a artefacto igual que el resto) y la
+  // barra divisoria con el coste de mejora que separa cada nivel salvo el
+  // primero.
+  for (const c of ['w', 'u', 'b', 'r', 'g', 'm', 'a', 'l']) {
+    files.push([`img/frames/class/${c}.png`, `class/${c}.png`])
+  }
+  files.push(['img/frames/class/header.png', 'class/header.png'])
+
   // Tipografías: Beleren para títulos y tipos, MPlantin para el texto de reglas.
   for (const font of [
     'beleren-b.ttf',

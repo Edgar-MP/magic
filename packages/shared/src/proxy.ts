@@ -112,6 +112,23 @@ export const sagaChapterSchema = z.object({
 export type SagaChapter = z.infer<typeof sagaChapterSchema>
 
 /**
+ * Un nivel de Class: `cost` es el coste de maná de mejora para subir a ESTE
+ * nivel (notación de Scryfall, `{2}{U}`), vacío en el nivel 1 porque ese usa
+ * el coste normal de la carta (`text.mana`). `typeLine` no es una línea de
+ * tipo de verdad — en una Class real (comprobado contra Scryfall, p.ej.
+ * «Wizard Class») el tipo se queda igual en todos los niveles («Enchantment —
+ * Class»); lo que cambia por nivel es la etiqueta de la barra divisoria
+ * («Level 2», «Level 3»), así que aquí guarda esa etiqueta (vacío en el nivel
+ * 1, que no lleva barra). `text` es el efecto de ese nivel.
+ */
+export const classLevelSchema = z.object({
+  cost: z.string().default(''),
+  typeLine: z.string().default(''),
+  text: z.string().default(''),
+})
+export type ClassLevel = z.infer<typeof classLevelSchema>
+
+/**
  * Hechizo de aventura: el recuadro superpuesto sobre el marco normal de una
  * criatura (o cualquier otro layout base) con un segundo hechizo más pequeño,
  * como las de Throne of Eldraine. No es un `layout` aparte — convive con
@@ -133,9 +150,11 @@ export type Adventure = z.infer<typeof adventureSchema>
  * franja lateral con capítulos numerados; `battle` es la plantilla apaisada
  * de casillas de defensa (sólo la cara frontal: la trasera es una carta
  * normal aparte y se deja para una tarea futura de doble cara). No hay más
- * plantillas especiales todavía (class…), pero el campo ya deja sitio.
+ * plantillas especiales todavía, pero el campo ya deja sitio. `class` cambia
+ * a la franja de niveles apilados verticalmente (Baldur's Gate): cada nivel
+ * salvo el primero se activa pagando su coste de mejora, en orden.
  */
-export const CARD_LAYOUTS = ['card', 'planeswalker', 'saga', 'battle'] as const
+export const CARD_LAYOUTS = ['card', 'planeswalker', 'saga', 'battle', 'class'] as const
 export type CardLayout = (typeof CARD_LAYOUTS)[number]
 
 export const proxyDesignSchema = z.object({
@@ -179,6 +198,8 @@ export const proxyDesignSchema = z.object({
   abilities: z.array(planeswalkerAbilitySchema).default([]),
   /** Sólo si `layout` es `saga`: sus capítulos, de arriba a abajo. */
   chapters: z.array(sagaChapterSchema).default([]),
+  /** Sólo si `layout` es `class`: sus niveles, de arriba a abajo. */
+  levels: z.array(classLevelSchema).default([]),
   /** Sólo si `layout` es `battle`: sus casillas de defensa iniciales. */
   defense: z.string().default(''),
   /**

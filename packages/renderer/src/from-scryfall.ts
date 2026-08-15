@@ -1,4 +1,13 @@
-import type { Adventure, Card, Color, FrameColor, PlaneswalkerAbility, ProxyDesign, SagaChapter } from '@magic/shared'
+import type {
+  Adventure,
+  Card,
+  ClassLevel,
+  Color,
+  FrameColor,
+  PlaneswalkerAbility,
+  ProxyDesign,
+  SagaChapter,
+} from '@magic/shared'
 import { hasType, isBasicLand, isLegendary } from '@magic/shared'
 
 /**
@@ -130,6 +139,41 @@ function sagaChaptersOf(card: Card): SagaChapter[] {
 }
 
 /**
+ * El oracle de una Class (comprobado contra Scryfall real, «Wizard Class» /
+ * «Ranger Class»: a diferencia de Saga/Battle/Adventure, NO es de doble cara
+ * — todo vive en el `oracle_text` de la raíz, un solo bloque) es el texto del
+ * nivel 1 (con su recordatorio entre paréntesis) seguido de una línea
+ * `{coste}: Level N` por cada nivel siguiente, con el texto de ese nivel
+ * debajo hasta la próxima línea de coste o el final.
+ */
+const LEVEL_LINE = /^(\{[^}]+\}(?:\{[^}]+\})*)\s*:\s*Level\s*\d+\s*$/u
+
+function classLevelsOf(card: Card): ClassLevel[] {
+  const oracle = card.oracle_text ?? ''
+  const lines = oracle.split('\n')
+
+  const levels: ClassLevel[] = [{ cost: '', typeLine: '', text: '' }]
+  let currentText: string[] = []
+
+  for (const line of lines) {
+    const match = LEVEL_LINE.exec(line.trim())
+    if (match?.[1]) {
+      const current = levels[levels.length - 1]
+      if (current) current.text = currentText.join('\n')
+      currentText = []
+      const levelNumber = levels.length + 1
+      levels.push({ cost: match[1], typeLine: `Level ${levelNumber}`, text: '' })
+      continue
+    }
+    currentText.push(line)
+  }
+  const last = levels[levels.length - 1]
+  if (last) last.text = currentText.join('\n')
+
+  return levels
+}
+
+/**
  * Hechizo de aventura (`layout: 'adventure'`, como Bonecrusher Giant //
  * Stomp): `card_faces[0]` es la criatura principal, `card_faces[1]` el
  * hechizo pequeño. Se rellena aparte del resto del diseño, que ya usa
@@ -174,6 +218,8 @@ export function cardToDesign(
   const loyalty = card.loyalty ?? face?.loyalty ?? ''
   const saga = card.layout === 'saga' || hasType(card, 'Saga')
   const chapters = saga ? sagaChaptersOf(card) : []
+  const classCard = card.layout === 'class' || hasType(card, 'Class')
+  const levels = classCard ? classLevelsOf(card) : []
   // Las Battle reales son de doble cara (`layout: 'transform'`): la cara
   // frontal (de casillas) es la única que cubrimos, y su `defense` viene en
   // `card_faces[0]`, no en la raíz.
@@ -188,7 +234,15 @@ export function cardToDesign(
   return {
     id,
     sourceCardId: card.id,
-    layout: planeswalker ? 'planeswalker' : saga ? 'saga' : battle ? 'battle' : 'card',
+    layout: planeswalker
+      ? 'planeswalker'
+      : saga
+        ? 'saga'
+        : battle
+          ? 'battle'
+          : classCard
+            ? 'class'
+            : 'card',
     frameSet: 'm15',
     variant: 'regular',
     edited: false,
@@ -239,6 +293,7 @@ export function cardToDesign(
     loyalty,
     abilities,
     chapters,
+    levels,
     defense,
     backFaceId: null,
     isBackFace: false,

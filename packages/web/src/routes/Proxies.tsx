@@ -51,6 +51,7 @@ export function Proxies() {
       loyalty: '',
       abilities: [],
       chapters: [],
+      levels: [],
       defense: '',
       backFaceId: null,
       isBackFace: false,

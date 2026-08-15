@@ -4,6 +4,7 @@ import type { Box, FrameSet, TextBox, VariantSpec } from './frames.js'
 import {
   ADVENTURE,
   BATTLE,
+  CLASS,
   FONT_FAMILY,
   FRAME_ACCENT,
   FRAME_SETS,
@@ -69,6 +70,7 @@ export async function renderCardLayers(
   if (design.layout === 'planeswalker') return renderPlaneswalkerLayers(design, env, { width })
   if (design.layout === 'saga') return renderSagaLayers(design, env, { width })
   if (design.layout === 'battle') return renderBattleLayers(design, env, { width })
+  if (design.layout === 'class') return renderClassLayers(design, env, { width })
 
   const set = FRAME_SETS[design.frameSet] ?? M15
   const variant = VARIANTS[design.variant] ?? VARIANTS.regular
@@ -606,6 +608,181 @@ async function drawSagaChapters(
     ctx.fillText(chapter.chapter, 0, 0)
     ctx.restore()
   }
+}
+
+/**
+ * Plantilla de Class: mismo pergamino de Saga pero con el arte a la
+ * izquierda y la columna de niveles a la derecha. A diferencia de Saga no
+ * hay numeral romano en una insignia: cada nivel salvo el primero abre con
+ * una barra divisoria dorada (el asset `class/header.png`) con su coste de
+ * mejora a la izquierda y la etiqueta de nivel («Level 2»…) a la derecha,
+ * calcada de cómo se ve en una Class real (comprobado contra Wizard Class de
+ * Scryfall).
+ */
+async function renderClassLayers(
+  design: ProxyDesign,
+  env: RenderEnv,
+  { width = PREVIEW_WIDTH }: { width?: number } = {},
+): Promise<CardLayers> {
+  const height = Math.round(width / CLASS.aspect)
+
+  await env.ensureFonts(['title', 'titleSmallCaps', 'body', 'bodyItalic'])
+
+  const overlay = env.createSurface(width, height)
+  const { ctx } = overlay
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  const scale = { width, height }
+
+  const frame = await env.loadAsset(paths.classFrame(design.frameColor)).catch(() => undefined)
+  if (frame) ctx.drawImage(frame, 0, 0, scale.width, scale.height)
+
+  const symbolWidthPx = await drawClassSetSymbol(ctx, env, design, scale)
+  drawOneLine(ctx, design.text.name, CLASS.title, scale, {
+    maxWidth: reservedTitleWidth(design.text.mana, CLASS.title, CLASS.mana, scale),
+  })
+  await drawManaCost(ctx, env, design, CLASS.mana, scale)
+  drawOneLine(ctx, design.text.type, CLASS.type, scale, {
+    maxWidth: CLASS.type.width * scale.width - symbolWidthPx,
+  })
+  drawNote(ctx, design.text.note, CLASS.note, scale, FRAME_ACCENT[design.frameColor])
+  await drawClassLevels(ctx, env, design, scale)
+  drawInfoLine(ctx, design, CLASS.info, scale)
+
+  return { overlay, artBox: CLASS.art, width, height }
+}
+
+async function drawClassSetSymbol(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<number> {
+  if (!design.setSymbol) return 0
+  const symbol = await env.loadImage(design.setSymbol).catch(() => undefined)
+  if (!symbol) return 0
+
+  const box = px(CLASS.setSymbol, scale)
+  const symbolHeight = box.height
+  const symbolW = symbolHeight * (symbol.width / symbol.height)
+  ctx.drawImage(symbol, box.x - symbolW, box.y - symbolHeight / 2, symbolW, symbolHeight)
+  return Math.max(0, CLASS.type.width * scale.width - (box.x - symbolW - CLASS.type.x * scale.width))
+}
+
+/**
+ * Filas de niveles repartidas a partes iguales dentro de la columna, igual
+ * que `sagaRows` reparte los capítulos.
+ */
+function classRows(design: ProxyDesign, scale: Scale): { y: number; height: number }[] {
+  const box = px(CLASS.levels, scale)
+  const count = Math.max(1, design.levels.length)
+  const rowHeight = box.height / count
+  return design.levels.map((_, i) => ({ y: box.y + i * rowHeight, height: rowHeight }))
+}
+
+async function drawClassLevels(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  design: ProxyDesign,
+  scale: Scale,
+): Promise<void> {
+  if (design.levels.length === 0) return
+
+  const box = px(CLASS.levels, scale)
+  const rows = classRows(design, scale)
+  const divider = await env.loadAsset(paths.classDivider()).catch(() => undefined)
+
+  // El texto no puede salirse de la columna pase lo que pase.
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(box.x, box.y, box.width, box.height)
+  ctx.clip()
+
+  const nominal = scale.height * 0.0262
+  // Alto de la barra divisoria: proporcional al ancho de la columna (misma
+  // relación de aspecto que `class/header.png`, 633×101), con un tope para
+  // que en niveles con poca altura de fila no se coma todo el sitio del texto.
+  const dividerAspect = 101 / 633
+
+  for (const [i, level] of design.levels.entries()) {
+    const row = rows[i]
+    if (!row) continue
+
+    const dividerHeight = i === 0 ? 0 : Math.min(box.width * dividerAspect, row.height * 0.34)
+
+    if (i > 0 && divider) {
+      ctx.drawImage(divider, box.x, row.y, box.width, dividerHeight)
+
+      const manaBoxPx: TextBox = {
+        x: CLASS.levels.x,
+        y: row.y / scale.height,
+        width: (CLASS.levels.width * 0.55),
+        height: dividerHeight / scale.height,
+        size: (dividerHeight * 0.62) / scale.height,
+        font: 'title',
+      }
+      await drawManaCostString(ctx, env, level.cost, manaBoxPx, scale)
+
+      if (level.typeLine.trim() !== '') {
+        const labelBox: TextBox = {
+          x: CLASS.levels.x,
+          y: row.y / scale.height,
+          width: CLASS.levels.width,
+          height: dividerHeight / scale.height,
+          size: (dividerHeight * 0.42) / scale.height,
+          font: 'title',
+          align: 'right',
+          oneLine: true,
+          middle: true,
+        }
+        drawOneLine(ctx, level.typeLine, labelBox, scale, { color: '#1a1a1a' })
+      }
+    }
+
+    const rowBox: TextBox = {
+      x: CLASS.levels.x,
+      y: (row.y + dividerHeight) / scale.height,
+      width: CLASS.levels.width,
+      height: (row.height - dividerHeight) / scale.height,
+      size: nominal / scale.height,
+      font: 'body',
+    }
+    const rowPx = px(rowBox, scale)
+
+    const tokens = tokenize(level.text)
+    const measureText = (text: string, fontSize: number, italic: boolean) => {
+      ctx.font = fontString(rowBox, fontSize, italic)
+      return ctx.measureText(text).width
+    }
+    const layout = layoutAutofit(tokens, {
+      width: rowPx.width,
+      height: rowPx.height,
+      fontSize: nominal,
+      minFontSize: nominal * 0.3,
+      measureText,
+    })
+
+    let y = rowPx.y + Math.max(0, (rowPx.height - layout.height) / 2)
+    for (const line of layout.lines) {
+      y += line.spaceBefore
+      if (!line.divider) await drawLine(ctx, env, line, rowBox, layout.fontSize, rowPx.x, y)
+      y += layout.lineHeight
+    }
+  }
+  ctx.restore()
+
+  // Separadores finos entre niveles, como en Saga.
+  ctx.save()
+  ctx.strokeStyle = 'rgba(120,95,40,0.35)'
+  ctx.lineWidth = Math.max(1, scale.height * 0.0012)
+  for (const row of rows.slice(1)) {
+    ctx.beginPath()
+    ctx.moveTo(box.x, row.y)
+    ctx.lineTo(box.x + box.width, row.y)
+    ctx.stroke()
+  }
+  ctx.restore()
 }
 
 /**
@@ -1147,7 +1324,21 @@ async function drawManaCost(
   manaBox: TextBox,
   scale: Scale,
 ): Promise<void> {
-  const symbols = tokenizeManaCost(design.text.mana)
+  await drawManaCostString(ctx, env, design.text.mana, manaBox, scale)
+}
+
+/**
+ * Igual que `drawManaCost`, pero para un coste suelto que no viene de
+ * `design.text.mana` — el coste de mejora de un nivel de Class, por ejemplo.
+ */
+async function drawManaCostString(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  manaCost: string,
+  manaBox: TextBox,
+  scale: Scale,
+): Promise<void> {
+  const symbols = tokenizeManaCost(manaCost)
   if (symbols.length === 0) return
 
   const box = px(manaBox, scale)

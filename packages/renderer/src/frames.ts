@@ -492,6 +492,89 @@ export const BATTLE = {
 }
 
 /**
+ * Geometría del marco de Class: mismo pergamino que Saga (mismo asset base
+ * `1500×2100`, misma cinta de rodillo arriba/abajo), pero con el arte a la
+ * IZQUIERDA en vez de a la derecha, y sin decoración de esquina que recorte
+ * el arranque de la columna de texto. Verificado con `getImageData` sobre
+ * `class/w.png` (script de calibración, borrado tras comprobar): en la fila
+ * y=0.5 el arte (alfa=0) va de x=0.0767 a x=0.4987, y la columna de texto
+ * (pergamino claro) de x=0.5013 a x=0.9233 — casi exactamente el espejo del
+ * arte de Saga (`SAGA.art`: x=0.5015, width=0.422). En la columna x=0.5 el
+ * pergamino claro del título va de y≈0.0495 a y≈0.1005 y el de tipo de
+ * y≈0.8467 a y≈0.8971, coincidiendo con los valores de
+ * `js/frames/packClass.js` de CardConjurer (title y=0.0522 h=0.0543, type
+ * y=0.8481 h=0.0543) dentro del margen de medición — así que, a diferencia de
+ * Saga/Battle, aquí sí se pudo confiar en esas coordenadas una vez
+ * contrastadas contra el PNG real.
+ */
+export const CLASS = {
+  aspect: 1500 / 2100,
+  art: { x: 0.0767, y: 0.111, width: 0.422, height: 0.7285 },
+  setSymbol: { x: 0.9213, y: 0.8753, width: 0.12, height: 0.041, align: 'right' as const },
+  title: {
+    x: 0.0854,
+    y: 0.0522,
+    width: 0.8292,
+    height: 0.0543,
+    size: 0.0381,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  mana: {
+    x: 0.0854,
+    y: 0.0522,
+    width: 0.8292,
+    height: 0.0543,
+    size: 0.0338,
+    font: 'title' as const,
+    align: 'right' as const,
+    oneLine: true,
+  },
+  type: {
+    x: 0.0854,
+    y: 0.8481,
+    width: 0.8292,
+    height: 0.0543,
+    size: 0.0324,
+    font: 'title' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /**
+   * Columna completa de niveles: arranca en el mismo borde que el arte (no
+   * hay esquina decorativa que la recorte, a diferencia de la cinta de
+   * Saga) y acaba a la misma altura donde el arte termina. Con margen
+   * interior de ~0.008–0.01 por cada lado respecto al filo del pergamino
+   * (medido: pergamino x=0.5013–0.9233), igual que `level0c`/`level1c` de
+   * `packClass.js` (x=0.5093, width=0.404 → hasta x=0.9133).
+   */
+  levels: { x: 0.509, y: 0.111, width: 0.404, height: 0.7285 },
+  /** Etiqueta bajo el nombre: mismo hueco que en el marco normal, sobre el arte. */
+  note: {
+    x: 0.075,
+    y: 0.104,
+    width: 0.855,
+    height: 0.0295,
+    size: 0.0207,
+    font: 'body' as const,
+    align: 'center' as const,
+    oneLine: true,
+    middle: true,
+  },
+  /** Artista e info: calcado del marco normal, pegado al filo inferior. */
+  info: {
+    x: 0.0854,
+    y: 0.9476,
+    width: 0.8292,
+    height: 0.022,
+    size: 0.0186,
+    font: 'body' as const,
+    color: '#ffffff',
+  },
+}
+
+/**
  * Geometría del recuadro de hechizo de aventura: se superpone al marco normal
  * (`card`, o cualquier otro layout base), dentro de la ventana de arte, sin
  * marco propio de CardConjurer/CardConjurer-fork (no hay ninguno en
@@ -826,6 +909,26 @@ export const paths = {
    */
   battleDefenseMask(): string {
     return 'battle/maskDefense.png'
+  },
+
+  /**
+   * El marco de Class tiene una letra por archivo (w,u,b,r,g,m,a), más un
+   * único `l.png` de tierra (sin distinguir color) y sin vehículo ni
+   * incoloro propios: los dos caen en artefacto, igual que hace `variantLetter`
+   * con el arte extendido.
+   */
+  classFrame(color: FrameColor): string {
+    if (isLandFrame(color)) return 'class/l.png'
+    const actual = color === 'vehicle' || color === 'colorless' ? 'artifact' : color
+    return `class/${LETTER[actual].toLowerCase()}.png`
+  },
+
+  /**
+   * Barra divisoria dorada con el hueco en «V» donde va el coste de mejora y
+   * la etiqueta de nivel, entre cada nivel de Class salvo el primero.
+   */
+  classDivider(): string {
+    return 'class/header.png'
   },
 
   /** Reverso clásico de Magic. */
