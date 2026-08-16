@@ -157,6 +157,10 @@ export type Adventure = z.infer<typeof adventureSchema>
 export const CARD_LAYOUTS = ['card', 'planeswalker', 'saga', 'battle', 'class'] as const
 export type CardLayout = (typeof CARD_LAYOUTS)[number]
 
+/** Color con el que se repinta el símbolo de expansión según la rareza. */
+export const SET_SYMBOL_RARITIES = ['common', 'uncommon', 'rare', 'mythic'] as const
+export type SetSymbolRarity = (typeof SET_SYMBOL_RARITIES)[number]
+
 export const proxyDesignSchema = z.object({
   id: z.string(),
   /** Carta de Scryfall de la que salió, para poder volver a ella. */
@@ -187,6 +191,13 @@ export const proxyDesignSchema = z.object({
   }),
   /** Símbolo de expansión: URL del SVG (Scryfall lo da por expansión). */
   setSymbol: z.string().optional(),
+  /**
+   * Si se rellena, se repinta el símbolo del color de esa rareza (igual que
+   * las cartas reales) en vez de dejar los colores propios del SVG — pensado
+   * sobre todo para símbolos subidos a mano, que suelen venir en negro/blanco
+   * sin ningún color de rareza.
+   */
+  setSymbolRarity: z.enum(['common', 'uncommon', 'rare', 'mythic']).optional(),
   /**
    * Marca de agua grande de tierra básica. Las básicas no llevan texto de
    * reglas, llevan este símbolo centrado en la caja de texto.

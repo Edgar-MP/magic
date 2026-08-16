@@ -257,8 +257,13 @@ async function drawPlaneswalkerSetSymbol(
   const box = px(PLANESWALKER.setSymbol, scale)
   const height = box.height
   const width = height * (symbol.width / symbol.height)
-  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
-  return Math.max(0, PLANESWALKER.title.width * scale.width - (box.x - width - PLANESWALKER.title.x * scale.width))
+  drawSetSymbolRecolored(ctx, env, symbol, box.x - width, box.y - height / 2, width, height, design.setSymbolRarity)
+  return Math.max(
+    0,
+    PLANESWALKER.type.width * scale.width -
+      (box.x - width - PLANESWALKER.type.x * scale.width) +
+      setSymbolGap(scale),
+  )
 }
 
 async function drawPlaneswalkerStamp(
@@ -492,8 +497,11 @@ async function drawSagaSetSymbol(
   const box = px(SAGA.setSymbol, scale)
   const height = box.height
   const width = height * (symbol.width / symbol.height)
-  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
-  return Math.max(0, SAGA.type.width * scale.width - (box.x - width - SAGA.type.x * scale.width))
+  drawSetSymbolRecolored(ctx, env, symbol, box.x - width, box.y - height / 2, width, height, design.setSymbolRarity)
+  return Math.max(
+    0,
+    SAGA.type.width * scale.width - (box.x - width - SAGA.type.x * scale.width) + setSymbolGap(scale),
+  )
 }
 
 /**
@@ -666,8 +674,20 @@ async function drawClassSetSymbol(
   const box = px(CLASS.setSymbol, scale)
   const symbolHeight = box.height
   const symbolW = symbolHeight * (symbol.width / symbol.height)
-  ctx.drawImage(symbol, box.x - symbolW, box.y - symbolHeight / 2, symbolW, symbolHeight)
-  return Math.max(0, CLASS.type.width * scale.width - (box.x - symbolW - CLASS.type.x * scale.width))
+  drawSetSymbolRecolored(
+    ctx,
+    env,
+    symbol,
+    box.x - symbolW,
+    box.y - symbolHeight / 2,
+    symbolW,
+    symbolHeight,
+    design.setSymbolRarity,
+  )
+  return Math.max(
+    0,
+    CLASS.type.width * scale.width - (box.x - symbolW - CLASS.type.x * scale.width) + setSymbolGap(scale),
+  )
 }
 
 /**
@@ -839,8 +859,11 @@ async function drawBattleSetSymbol(
   const box = px(BATTLE.setSymbol, scale)
   const height = box.height
   const width = height * (symbol.width / symbol.height)
-  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
-  return Math.max(0, BATTLE.type.width * scale.width - (box.x - width - BATTLE.type.x * scale.width))
+  drawSetSymbolRecolored(ctx, env, symbol, box.x - width, box.y - height / 2, width, height, design.setSymbolRarity)
+  return Math.max(
+    0,
+    BATTLE.type.width * scale.width - (box.x - width - BATTLE.type.x * scale.width) + setSymbolGap(scale),
+  )
 }
 
 async function drawBattleStamp(
@@ -1095,6 +1118,57 @@ function fillMasked(
   ctx.drawImage(layer.asImage(), 0, 0)
 }
 
+/** Mismo color que usan las cartas reales para cada rareza del símbolo. */
+const RARITY_COLOR: Record<NonNullable<ProxyDesign['setSymbolRarity']>, string> = {
+  common: '#0a0a0a',
+  uncommon: '#b6c0c9',
+  rare: '#c9a349',
+  mythic: '#d8552c',
+}
+
+/**
+ * Repinta una imagen ya dibujada (el símbolo de expansión, normalmente en
+ * negro/blanco) del color de una rareza, igual que las cartas reales. Se
+ * pinta primero el símbolo tal cual (para tener su silueta con canales alfa)
+ * y luego se rellena sólo esa silueta — sin esto, un SVG subido a mano se ve
+ * siempre en blanco y negro sin importar la rareza real de la carta.
+ */
+function drawSetSymbolRecolored(
+  ctx: CanvasRenderingContext2D,
+  env: RenderEnv,
+  image: CanvasImageSource,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  rarity: NonNullable<ProxyDesign['setSymbolRarity']> | undefined,
+): void {
+  if (!rarity) {
+    ctx.drawImage(image, x, y, width, height)
+    return
+  }
+  // `source-in` compara TODO el lienzo, no sólo el rectángulo que se rellena:
+  // aplicarlo directamente sobre `ctx` (que ya tiene el resto de la carta
+  // dibujada) borraría cualquier píxel de fuera de esta zona. Se compone
+  // aparte, en un lienzo del tamaño justo del símbolo, y sólo el resultado ya
+  // recortado se pega en la carta.
+  const layer = env.createSurface(Math.max(1, Math.ceil(width)), Math.max(1, Math.ceil(height)))
+  layer.ctx.drawImage(image, 0, 0, width, height)
+  layer.ctx.globalCompositeOperation = 'source-in'
+  layer.ctx.fillStyle = RARITY_COLOR[rarity]
+  layer.ctx.fillRect(0, 0, width, height)
+  ctx.drawImage(layer.asImage(), x, y, width, height)
+}
+
+/**
+ * Cuánto hueco extra dejar entre el símbolo y el texto de tipo a su
+ * izquierda: sin esto, un símbolo ancho (sobre todo uno subido a mano, cuya
+ * proporción no se conoce de antemano) podía quedar pegado al texto.
+ */
+function setSymbolGap(scale: Scale): number {
+  return scale.width * 0.014
+}
+
 /** El símbolo grande centrado en la caja de texto de las tierras básicas. */
 async function drawBasicWatermark(
   ctx: CanvasRenderingContext2D,
@@ -1212,14 +1286,14 @@ async function drawSetSymbol(
   const box = px(setSymbolBoxOf(set, variant), scale)
   const height = box.height
   const width = height * (symbol.width / symbol.height)
-  ctx.drawImage(symbol, box.x - width, box.y - height / 2, width, height)
+  drawSetSymbolRecolored(ctx, env, symbol, box.x - width, box.y - height / 2, width, height, design.setSymbolRarity)
 
   // Lo que se come del ancho de la línea de tipo: desde donde empieza el
   // símbolo hasta donde acababa la caja del tipo.
   const type = textBoxOf(set, variant, 'type')
   if (!type) return 0
   const typeRight = (type.x + type.width) * scale.width
-  return Math.max(0, typeRight - (box.x - width))
+  return Math.max(0, typeRight - (box.x - width) + setSymbolGap(scale))
 }
 
 // --- Texto -------------------------------------------------------------------

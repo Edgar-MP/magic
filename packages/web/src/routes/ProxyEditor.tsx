@@ -5,6 +5,7 @@ import {
   CARD_VARIANTS,
   CARD_VARIANT_LABELS,
   FRAME_COLORS,
+  SET_SYMBOL_RARITIES,
   type Adventure,
   type CardVariant,
   type ClassLevel,
@@ -12,6 +13,7 @@ import {
   type PlaneswalkerAbility,
   type ProxyDesign,
   type SagaChapter,
+  type SetSymbolRarity,
   type ProxyFile,
 } from '@magic/shared'
 import { CardPreview } from '../components/CardPreview.js'
@@ -43,6 +45,13 @@ const BASIC_SYMBOLS: [BasicSymbol, string][] = [
   ['g', 'Bosque (verde)'],
   ['c', 'Yermos (incoloro)'],
 ]
+
+const RARITY_LABELS: Record<SetSymbolRarity, string> = {
+  common: 'Común (negro)',
+  uncommon: 'Infrecuente (plata)',
+  rare: 'Rara (oro)',
+  mythic: 'Mítica (naranja)',
+}
 
 const FRAME_LABELS: Record<FrameColor, string> = {
   white: 'Blanco',
@@ -573,6 +582,27 @@ export function ProxyEditor() {
                     </>
                   )}
                 </div>
+                {draft.setSymbol && (
+                  <label className="flex items-center gap-2 text-xs text-muted">
+                    Rareza (repinta el símbolo de ese color)
+                    <select
+                      value={draft.setSymbolRarity ?? ''}
+                      onChange={(e) =>
+                        update({
+                          setSymbolRarity: e.target.value === '' ? undefined : (e.target.value as SetSymbolRarity),
+                        })
+                      }
+                      className="rounded border border-edge bg-panel px-2 py-1 text-xs outline-none focus:border-accent"
+                    >
+                      <option value="">Colores propios del SVG</option>
+                      {SET_SYMBOL_RARITIES.map((r) => (
+                        <option key={r} value={r}>
+                          {RARITY_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
             </div>
           </Section>
