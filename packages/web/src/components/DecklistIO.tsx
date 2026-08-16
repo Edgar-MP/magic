@@ -25,7 +25,7 @@ export function DecklistIO({
       const card = cards.get(entry.cardId)
       return {
         qty: entry.qty,
-        name: card?.name ?? entry.cardId,
+        name: card?.printed_name ?? card?.name ?? entry.cardId,
         ...(card ? { set: card.set, ...(card.collector_number ? { collectorNumber: card.collector_number } : {}) } : {}),
         board: entry.board,
       }

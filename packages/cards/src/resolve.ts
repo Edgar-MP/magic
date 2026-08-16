@@ -1,6 +1,6 @@
 import type { Board, Card, DeckEntry, ParsedDecklist } from '@magic/shared'
 import { getCards, putCards } from './db.js'
-import { collection, type CardIdentifier } from './scryfall.js'
+import { collection, search, type CardIdentifier } from './scryfall.js'
 
 /**
  * Carga cartas por id tirando primero de la caché local y pidiendo a Scryfall
@@ -52,18 +52,36 @@ export async function resolveDecklist(parsed: ParsedDecklist): Promise<ResolvedD
   }
 
   const entries: DeckEntry[] = []
-  const notFound: ResolvedDecklist['notFound'] = []
+  const unresolved: ParsedDecklist['lines'] = []
 
   for (const line of parsed.lines) {
     const card = byName.get(nameKey(line.name))
     if (!card) {
-      notFound.push({ qty: line.qty, name: line.name, board: line.board })
+      unresolved.push(line)
       continue
     }
     // Dos líneas pueden apuntar a la misma impresión (main y side): se suman.
     const existing = entries.find((e) => e.cardId === card.id && e.board === line.board)
     if (existing) existing.qty += line.qty
     else entries.push({ cardId: card.id, qty: line.qty, board: line.board })
+  }
+
+  // `collection()` sólo resuelve por el nombre canónico (inglés): una línea en
+  // castellano (p. ej. una lista exportada o copiada de un mazo en español)
+  // no encaja ahí. Antes de darla por no encontrada, se reintenta como nombre
+  // impreso en español — mismo truco que ya usa el buscador con el toggle ES.
+  const notFound: ResolvedDecklist['notFound'] = []
+  for (const line of unresolved) {
+    const spanish = await search(`!"${line.name}" lang:es`, { unique: 'cards' })
+    const match = spanish.cards[0]
+    if (!match) {
+      notFound.push({ qty: line.qty, name: line.name, board: line.board })
+      continue
+    }
+    await putCards([match])
+    const existing = entries.find((e) => e.cardId === match.id && e.board === line.board)
+    if (existing) existing.qty += line.qty
+    else entries.push({ cardId: match.id, qty: line.qty, board: line.board })
   }
 
   return { entries, notFound, invalid: parsed.errors }
