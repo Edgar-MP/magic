@@ -168,6 +168,22 @@ export function ProxyEditor() {
   }
 
   /**
+   * `setSymbol` es sólo un string (URL) — a diferencia del arte no hace falta
+   * un blob en Dexie: un SVG de símbolo pesa unos pocos KB, así que se guarda
+   * como URL de datos embebida directamente en el proxy. Así funciona igual
+   * de bien sin cuenta ni sincronización de blobs.
+   */
+  const uploadSetSymbol = async (file: File) => {
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
+    update({ setSymbol: dataUrl })
+  }
+
+  /**
    * Añade o quita el dorso ya escriben directamente en Dexie (no pasan por el
    * borrador ni por «Guardar»), así que el cambio se refleja en el borrador a
    * mano y sin marcarlo `dirty`: no hay nada pendiente de guardar por esto.
@@ -524,12 +540,40 @@ export function ProxyEditor() {
                 </label>
               )}
 
-              <Field
-                label="Símbolo de expansión (URL)"
-                value={draft.setSymbol ?? ''}
-                onChange={(v) => update(v.trim() === '' ? { setSymbol: undefined } : { setSymbol: v })}
-                hint="Se rellena al crear el proxy desde una carta real."
-              />
+              <div className="flex flex-col gap-1.5">
+                <Field
+                  label="Símbolo de expansión (URL)"
+                  value={draft.setSymbol ?? ''}
+                  onChange={(v) => update(v.trim() === '' ? { setSymbol: undefined } : { setSymbol: v })}
+                  hint="Se rellena al crear el proxy desde una carta real."
+                />
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer rounded border border-edge bg-panel px-2 py-1 text-xs text-muted hover:border-accent hover:text-white">
+                    Subir símbolo (SVG)
+                    <input
+                      type="file"
+                      accept="image/svg+xml,.svg"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) void uploadSetSymbol(file)
+                      }}
+                    />
+                  </label>
+                  {draft.setSymbol && (
+                    <>
+                      <img src={draft.setSymbol} alt="" className="h-5 w-auto" />
+                      <button
+                        type="button"
+                        onClick={() => update({ setSymbol: undefined })}
+                        className="text-xs text-muted hover:text-red-400"
+                      >
+                        Quitar
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </Section>
 
